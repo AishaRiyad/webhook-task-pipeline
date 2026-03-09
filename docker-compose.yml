@@ -1,0 +1,87 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: webhook_pipeline_db
+    restart: always
+    environment:
+      POSTGRES_DB: webhook_pipeline
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d webhook_pipeline"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  db_init:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: webhook_pipeline
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    command: npm run db:init
+
+  api:
+    build: .
+    container_name: webhook_pipeline_api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db_init:
+        condition: service_completed_successfully
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: webhook_pipeline
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    command: npm run dev
+
+  job_worker:
+    build: .
+    container_name: webhook_pipeline_worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db_init:
+        condition: service_completed_successfully
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: webhook_pipeline
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    command: npm run worker
+
+  delivery_worker:
+    build: .
+    container_name: webhook_pipeline_delivery_worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db_init:
+        condition: service_completed_successfully
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: webhook_pipeline
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    command: npm run worker:delivery
+
+volumes:
+  postgres_data:
