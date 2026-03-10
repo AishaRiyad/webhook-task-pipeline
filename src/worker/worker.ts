@@ -6,7 +6,7 @@ import {
   createJobRecord,
   createWebhookEventRecord,
 } from "../modules/webhooks/webhook.repository";
-
+import { sendFailureNotification } from "../shared/utils/failureNotifier";
 
 const WORKER_NAME = process.env.WORKER_NAME || "job-worker";
 
@@ -91,6 +91,8 @@ async function fetchNextJob() {
 }
 
 async function processJob(job: any) {
+  let pipeline: any = null;
+
   try {
     console.log(`[${WORKER_NAME}] Processing job: ${job.id}`);
 
@@ -117,7 +119,7 @@ async function processJob(job: any) {
       [job.pipeline_id]
     );
 
-    const pipeline = pipelineResult.rows[0];
+    pipeline = pipelineResult.rows[0];
     if (!pipeline) {
       throw new Error(`Pipeline not found for job ${job.id}`);
     }
@@ -126,38 +128,105 @@ async function processJob(job: any) {
     let shouldSkipJob = false;
     let skipReason: string | null = null;
 
-    if (pipeline.action_type === "deduplicate") {
-  const idField = pipeline.action_config?.id_field;
+    if (pipeline.action_config?.force_fail === true) {
+      throw new Error("Forced processing failure for testing");
+    }
 
-  if (idField) {
-    const eventId = event.payload?.[idField];
+    if (pipeline.action_type === "running_sum") {
+      const groupField = pipeline.action_config?.group_by_field;
+      const valueField = pipeline.action_config?.value_field;
+      const targetField = pipeline.action_config?.target_field;
 
-    if (eventId) {
-      const duplicateCheck = await pool.query(
+      if (!groupField || !valueField || !targetField) {
+        throw new Error("Invalid running_sum configuration");
+      }
+
+      const groupKey = String(event.payload?.[groupField]);
+      const value = Number(event.payload?.[valueField]);
+
+      if (!groupKey || Number.isNaN(value)) {
+        throw new Error("Invalid aggregation payload values");
+      }
+
+      const existing = await pool.query(
         `
-        SELECT COUNT(*)
-        FROM webhook_events
-        WHERE pipeline_id = $1
-          AND payload ->> $2 = $3
-          AND id != $4
+        SELECT *
+        FROM pipeline_aggregates
+        WHERE pipeline_id = $1 AND group_key = $2
         `,
-        [pipeline.id, idField, String(eventId), event.id]
+        [pipeline.id, groupKey]
       );
 
-      const count = Number(duplicateCheck.rows[0].count);
+      let newTotal;
 
-      if (count > 0) {
-        console.log(
-          `[${WORKER_NAME}] Duplicate event detected for ${eventId}`
+      if (existing.rows.length === 0) {
+        newTotal = value;
+
+        await pool.query(
+          `
+          INSERT INTO pipeline_aggregates (
+            id,
+            pipeline_id,
+            group_key,
+            aggregate_value
+          )
+          VALUES ($1,$2,$3,$4)
+          `,
+          [randomUUID(), pipeline.id, groupKey, newTotal]
         );
+      } else {
+        const current = Number(existing.rows[0].aggregate_value);
+        newTotal = current + value;
 
-        shouldSkipJob = true;
-        skipReason = `Duplicate event detected for ${eventId}`;
-        processedPayload = null;
+        await pool.query(
+          `
+          UPDATE pipeline_aggregates
+          SET aggregate_value = $3,
+              updated_at = NOW()
+          WHERE pipeline_id = $1 AND group_key = $2
+          `,
+          [pipeline.id, groupKey, newTotal]
+        );
+      }
+
+      processedPayload = {
+        ...event.payload,
+        [targetField]: newTotal,
+      };
+    }
+
+    if (pipeline.action_type === "deduplicate") {
+      const idField = pipeline.action_config?.id_field;
+
+      if (idField) {
+        const eventId = event.payload?.[idField];
+
+        if (eventId) {
+          const duplicateCheck = await pool.query(
+            `
+            SELECT COUNT(*)
+            FROM webhook_events
+            WHERE pipeline_id = $1
+              AND payload ->> $2 = $3
+              AND id != $4
+            `,
+            [pipeline.id, idField, String(eventId), event.id]
+          );
+
+          const count = Number(duplicateCheck.rows[0].count);
+
+          if (count > 0) {
+            console.log(
+              `[${WORKER_NAME}] Duplicate event detected for ${eventId}`
+            );
+
+            shouldSkipJob = true;
+            skipReason = `Duplicate event detected for ${eventId}`;
+            processedPayload = null;
+          }
+        }
       }
     }
-  }
-}
 
     if (pipeline.action_type === "transform") {
       const fields = pipeline.action_config?.fields ?? [];
@@ -188,38 +257,38 @@ async function processJob(job: any) {
       }
     }
 
-   if (shouldSkipJob) {
-  await pool.query(
-    `
-    UPDATE jobs
-    SET status = 'skipped',
-        completed_at = NOW(),
-        result_payload = NULL,
-        error_message = $2
-    WHERE id = $1
-    `,
-    [job.id, skipReason]
-  );
+    if (shouldSkipJob) {
+      await pool.query(
+        `
+        UPDATE jobs
+        SET status = 'skipped',
+            completed_at = NOW(),
+            result_payload = NULL,
+            error_message = $2
+        WHERE id = $1
+        `,
+        [job.id, skipReason]
+      );
 
-  console.log(`[${WORKER_NAME}] Job skipped: ${job.id}`);
-  return;
-}
+      console.log(`[${WORKER_NAME}] Job skipped: ${job.id}`);
+      return;
+    }
 
-await pool.query(
-  `
-  UPDATE jobs
-  SET status = 'completed',
-      completed_at = NOW(),
-      result_payload = $2
-  WHERE id = $1
-  `,
-  [job.id, processedPayload]
-);
+    await pool.query(
+      `
+      UPDATE jobs
+      SET status = 'completed',
+          completed_at = NOW(),
+          result_payload = $2
+      WHERE id = $1
+      `,
+      [job.id, processedPayload]
+    );
 
-if (processedPayload) {
-  await createDeliveriesForJob(job.id, job.pipeline_id);
-  await enqueueChainedJobs(job, processedPayload as Record<string, unknown>);
-}
+    if (processedPayload) {
+      await createDeliveriesForJob(job.id, job.pipeline_id);
+      await enqueueChainedJobs(job, processedPayload as Record<string, unknown>);
+    }
 
     console.log(`[${WORKER_NAME}] Job completed: ${job.id}`);
   } catch (error) {
@@ -233,6 +302,24 @@ if (processedPayload) {
       `,
       [job.id, error instanceof Error ? error.message : "Unknown error"]
     );
+
+    if (pipeline?.user_id) {
+      await sendFailureNotification({
+        user_id: pipeline.user_id,
+        type: "job_failed",
+        title: "Job Processing Failed",
+        message: `Job ${job.id} failed during pipeline processing`,
+        timestamp: new Date().toISOString(),
+        details: {
+          job_id: job.id,
+          pipeline_id: job.pipeline_id,
+          webhook_event_id: job.webhook_event_id,
+          worker_name: WORKER_NAME,
+          error:
+            error instanceof Error ? error.message : "Unknown processing error",
+        },
+      });
+    }
 
     console.error(`[${WORKER_NAME}] Job failed: ${job.id}`, error);
   }

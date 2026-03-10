@@ -20,6 +20,16 @@ CREATE TABLE IF NOT EXISTS pipeline_links (
     CONSTRAINT pipeline_links_no_self_loop CHECK (source_pipeline_id <> target_pipeline_id)
 );
 
+CREATE TABLE IF NOT EXISTS pipeline_aggregates (
+    id UUID PRIMARY KEY,
+    pipeline_id UUID NOT NULL REFERENCES pipelines(id) ON DELETE CASCADE,
+    group_key VARCHAR(255) NOT NULL,
+    aggregate_value NUMERIC NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE (pipeline_id, group_key)
+);
+
 CREATE TABLE IF NOT EXISTS pipeline_subscribers (
     id UUID PRIMARY KEY,
     pipeline_id UUID NOT NULL REFERENCES pipelines(id) ON DELETE CASCADE,
@@ -91,4 +101,15 @@ CREATE TABLE IF NOT EXISTS delivery_attempt_logs (
     response_body TEXT NULL,
     error_message TEXT NULL,
     attempted_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS system_notifications (
+    id UUID PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
