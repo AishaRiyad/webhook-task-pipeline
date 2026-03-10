@@ -123,6 +123,41 @@ async function processJob(job: any) {
     }
 
     let processedPayload = event.payload;
+    let shouldSkipJob = false;
+    let skipReason: string | null = null;
+
+    if (pipeline.action_type === "deduplicate") {
+  const idField = pipeline.action_config?.id_field;
+
+  if (idField) {
+    const eventId = event.payload?.[idField];
+
+    if (eventId) {
+      const duplicateCheck = await pool.query(
+        `
+        SELECT COUNT(*)
+        FROM webhook_events
+        WHERE pipeline_id = $1
+          AND payload ->> $2 = $3
+          AND id != $4
+        `,
+        [pipeline.id, idField, String(eventId), event.id]
+      );
+
+      const count = Number(duplicateCheck.rows[0].count);
+
+      if (count > 0) {
+        console.log(
+          `[${WORKER_NAME}] Duplicate event detected for ${eventId}`
+        );
+
+        shouldSkipJob = true;
+        skipReason = `Duplicate event detected for ${eventId}`;
+        processedPayload = null;
+      }
+    }
+  }
+}
 
     if (pipeline.action_type === "transform") {
       const fields = pipeline.action_config?.fields ?? [];
@@ -153,21 +188,38 @@ async function processJob(job: any) {
       }
     }
 
-    await pool.query(
-      `
-      UPDATE jobs
-      SET status = 'completed',
-          completed_at = NOW(),
-          result_payload = $2
-      WHERE id = $1
-      `,
-      [job.id, processedPayload]
-    );
+   if (shouldSkipJob) {
+  await pool.query(
+    `
+    UPDATE jobs
+    SET status = 'skipped',
+        completed_at = NOW(),
+        result_payload = NULL,
+        error_message = $2
+    WHERE id = $1
+    `,
+    [job.id, skipReason]
+  );
 
-    if (processedPayload) {
-      await createDeliveriesForJob(job.id, job.pipeline_id);
-      await enqueueChainedJobs(job, processedPayload as Record<string, unknown>);
-    }
+  console.log(`[${WORKER_NAME}] Job skipped: ${job.id}`);
+  return;
+}
+
+await pool.query(
+  `
+  UPDATE jobs
+  SET status = 'completed',
+      completed_at = NOW(),
+      result_payload = $2
+  WHERE id = $1
+  `,
+  [job.id, processedPayload]
+);
+
+if (processedPayload) {
+  await createDeliveriesForJob(job.id, job.pipeline_id);
+  await enqueueChainedJobs(job, processedPayload as Record<string, unknown>);
+}
 
     console.log(`[${WORKER_NAME}] Job completed: ${job.id}`);
   } catch (error) {

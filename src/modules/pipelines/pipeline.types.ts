@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const createPipelineSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  action_type: z.enum(["transform", "filter", "enrich"]),
+  action_type: z.enum(["transform", "filter", "enrich", "deduplicate"]),
   action_config: z.record(z.string(), z.any()).optional(),
   subscribers: z
     .array(

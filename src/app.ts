@@ -7,8 +7,19 @@ import jobRoutes from "./modules/jobs/job.routes";
 import metricsRoutes from "./modules/metrics/metrics.routes";
 import authRoutes from "./modules/auth/auth.routes";
 import { authenticate } from "./shared/middleware/authMiddleware";
+import cors from "cors";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./config/swagger";
+
 
 const app = express();
+
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
 
 app.use(
   express.json({
@@ -34,6 +45,8 @@ app.get("/health", async (_req, res) => {
     });
   }
 });
+
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.post("/subscriber-order-service", (req, res) => {
   console.log("📦 ORDER SERVICE RECEIVED EVENT");
