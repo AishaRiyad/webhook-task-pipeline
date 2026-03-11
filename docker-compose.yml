@@ -50,7 +50,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       FAILURE_NOTIFICATION_URL: http://api:3000/subscriber-notification-service
-    command: npm run dev
+    command: npm run start
 
   job_worker:
     build: ./backend
@@ -67,7 +67,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       FAILURE_NOTIFICATION_URL: http://api:3000/subscriber-notification-service
-    command: npm run worker
+    command: npm run start:worker
 
   delivery_worker:
     build: ./backend
@@ -84,7 +84,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       FAILURE_NOTIFICATION_URL: http://api:3000/subscriber-notification-service
-    command: npm run worker:delivery
+    command: npm run start:delivery-worker
 
   frontend:
     build: ./frontend
