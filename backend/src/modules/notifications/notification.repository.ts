@@ -46,10 +46,7 @@ export async function findNotificationsByUserId(userId: string) {
   return result.rows;
 }
 
-export async function markNotificationAsRead(
-  notificationId: string,
-  userId: string
-) {
+export async function markNotificationAsRead(notificationId: string, userId: string) {
   const query = `
     UPDATE system_notifications
     SET is_read = TRUE

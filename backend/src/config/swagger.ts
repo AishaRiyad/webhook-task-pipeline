@@ -6,8 +6,7 @@ const options: swaggerJsdoc.Options = {
     info: {
       title: "Webhook-Driven Task Processing Pipeline API",
       version: "1.0.0",
-      description:
-        "API documentation for the webhook-driven task processing pipeline project",
+      description: "API documentation for the webhook-driven task processing pipeline project",
     },
     servers: [
       {
@@ -62,14 +61,7 @@ const options: swaggerJsdoc.Options = {
             },
             action_type: {
               type: "string",
-              enum: [
-                "transform",
-                "filter",
-                "enrich",
-                "deduplicate",
-                "aggregate",
-                "running_sum",
-              ],
+              enum: ["transform", "filter", "enrich", "deduplicate", "aggregate", "running_sum"],
               example: "running_sum",
             },
             action_config: {

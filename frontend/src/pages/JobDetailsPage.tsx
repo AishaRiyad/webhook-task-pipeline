@@ -18,17 +18,12 @@ export default function JobDetailsPage() {
       if (!id) return;
 
       try {
-        const [jobRes, pipelineRes] = await Promise.all([
-          getJobDetails(id),
-          getPipelines(),
-        ]);
+        const [jobRes, pipelineRes] = await Promise.all([getJobDetails(id), getPipelines()]);
 
         setJobData(jobRes.data);
         setPipelines(pipelineRes.data || []);
       } catch (error) {
-        setMessage(
-          error instanceof Error ? error.message : "Failed to load job details"
-        );
+        setMessage(error instanceof Error ? error.message : "Failed to load job details");
       } finally {
         setLoading(false);
       }
@@ -66,16 +61,30 @@ export default function JobDetailsPage() {
           <div className="details-column">
             <div className="cute-card">
               <h2>Job Information</h2>
-              <p className="muted"><strong>Job ID:</strong> {job.id}</p>
-              <p className="muted"><strong>Pipeline:</strong> {pipeline?.name || job.pipeline_id}</p>
-              <p className="muted"><strong>Status:</strong> {job.status}</p>
-              <p className="muted"><strong>Attempts:</strong> {job.attempts}</p>
-              <p className="muted"><strong>Created At:</strong> {new Date(job.created_at).toLocaleString()}</p>
+              <p className="muted">
+                <strong>Job ID:</strong> {job.id}
+              </p>
+              <p className="muted">
+                <strong>Pipeline:</strong> {pipeline?.name || job.pipeline_id}
+              </p>
+              <p className="muted">
+                <strong>Status:</strong> {job.status}
+              </p>
+              <p className="muted">
+                <strong>Attempts:</strong> {job.attempts}
+              </p>
+              <p className="muted">
+                <strong>Created At:</strong> {new Date(job.created_at).toLocaleString()}
+              </p>
               {job.completed_at && (
-                <p className="muted"><strong>Completed At:</strong> {new Date(job.completed_at).toLocaleString()}</p>
+                <p className="muted">
+                  <strong>Completed At:</strong> {new Date(job.completed_at).toLocaleString()}
+                </p>
               )}
               {job.failed_at && (
-                <p className="muted"><strong>Failed At:</strong> {new Date(job.failed_at).toLocaleString()}</p>
+                <p className="muted">
+                  <strong>Failed At:</strong> {new Date(job.failed_at).toLocaleString()}
+                </p>
               )}
             </div>
 
@@ -94,8 +103,12 @@ export default function JobDetailsPage() {
                         </span>
                       </div>
 
-                      <p className="muted"><strong>Target URL:</strong> {delivery.target_url || delivery.subscriber_id}</p>
-                      <p className="muted"><strong>Attempts:</strong> {delivery.attempts} / {delivery.max_attempts}</p>
+                      <p className="muted">
+                        <strong>Target URL:</strong> {delivery.target_url || delivery.subscriber_id}
+                      </p>
+                      <p className="muted">
+                        <strong>Attempts:</strong> {delivery.attempts} / {delivery.max_attempts}
+                      </p>
 
                       {delivery.last_response_status !== null &&
                         delivery.last_response_status !== undefined && (
@@ -105,18 +118,22 @@ export default function JobDetailsPage() {
                         )}
 
                       {delivery.last_error && (
-                        <p className="muted"><strong>Last Error:</strong> {delivery.last_error}</p>
+                        <p className="muted">
+                          <strong>Last Error:</strong> {delivery.last_error}
+                        </p>
                       )}
 
                       {delivery.next_retry_at && (
                         <p className="muted">
-                          <strong>Next Retry:</strong> {new Date(delivery.next_retry_at).toLocaleString()}
+                          <strong>Next Retry:</strong>{" "}
+                          {new Date(delivery.next_retry_at).toLocaleString()}
                         </p>
                       )}
 
                       {delivery.delivered_at && (
                         <p className="muted">
-                          <strong>Delivered At:</strong> {new Date(delivery.delivered_at).toLocaleString()}
+                          <strong>Delivered At:</strong>{" "}
+                          {new Date(delivery.delivered_at).toLocaleString()}
                         </p>
                       )}
                     </div>
@@ -137,17 +154,24 @@ export default function JobDetailsPage() {
                     <div key={attempt.id} className="sub-card">
                       <div className="row-between">
                         <h3>Attempt #{attempt.attempt_number}</h3>
-                        <span className={`badge ${attempt.response_status && attempt.response_status >= 200 && attempt.response_status < 300 ? "badge-green" : "badge-yellow"}`}>
-                          {attempt.response_status ? `HTTP ${attempt.response_status}` : "No Response"}
+                        <span
+                          className={`badge ${attempt.response_status && attempt.response_status >= 200 && attempt.response_status < 300 ? "badge-green" : "badge-yellow"}`}
+                        >
+                          {attempt.response_status
+                            ? `HTTP ${attempt.response_status}`
+                            : "No Response"}
                         </span>
                       </div>
 
                       <p className="muted">
-                        <strong>Attempted At:</strong> {new Date(attempt.attempted_at).toLocaleString()}
+                        <strong>Attempted At:</strong>{" "}
+                        {new Date(attempt.attempted_at).toLocaleString()}
                       </p>
 
                       {attempt.error_message && (
-                        <p className="muted"><strong>Error:</strong> {attempt.error_message}</p>
+                        <p className="muted">
+                          <strong>Error:</strong> {attempt.error_message}
+                        </p>
                       )}
 
                       {attempt.response_body && (

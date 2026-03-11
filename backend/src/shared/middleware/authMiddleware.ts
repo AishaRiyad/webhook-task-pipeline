@@ -8,11 +8,7 @@ export interface AuthenticatedRequest extends Request {
   user?: JwtPayload;
 }
 
-export function authenticate(
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-) {
+export function authenticate(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -32,11 +28,7 @@ export function authenticate(
   try {
     const decoded = jwt.verify(token, ACCESS_SECRET);
 
-    if (
-      typeof decoded !== "object" ||
-      !("userId" in decoded) ||
-      !("email" in decoded)
-    ) {
+    if (typeof decoded !== "object" || !("userId" in decoded) || !("email" in decoded)) {
       return res.status(401).json({
         message: "Invalid token payload",
       });

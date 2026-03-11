@@ -10,13 +10,7 @@ import {
 } from "../api/client";
 import type { Pipeline, PipelineLink } from "../types";
 
-type ActionType =
-  | "transform"
-  | "filter"
-  | "enrich"
-  | "deduplicate"
-  | "aggregate"
-  | "running_sum";
+type ActionType = "transform" | "filter" | "enrich" | "deduplicate" | "aggregate" | "running_sum";
 
 export default function PipelinesPage() {
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
@@ -139,9 +133,7 @@ export default function PipelinesPage() {
     try {
       setSubmitting(true);
 
-      const subscribers = subscriberUrl.trim()
-        ? [{ target_url: subscriberUrl.trim() }]
-        : [];
+      const subscribers = subscriberUrl.trim() ? [{ target_url: subscriberUrl.trim() }] : [];
 
       await createPipeline({
         name: name.trim(),

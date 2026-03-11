@@ -7,10 +7,11 @@ type WebhookParams = {
   sourceKey: string;
 };
 
-export async function ingestWebhookHandler(
-  req: Request<WebhookParams>,
-  res: Response
-) {
+type RawBodyRequest<TParams = Record<string, string>> = Request<TParams> & {
+  rawBody?: string;
+};
+
+export async function ingestWebhookHandler(req: RawBodyRequest<WebhookParams>, res: Response) {
   try {
     const sourceKey = req.params.sourceKey;
 
@@ -31,14 +32,9 @@ export async function ingestWebhookHandler(
       });
     }
 
-    const rawBody = (req as any).rawBody ?? "";
+    const rawBody = req.rawBody ?? "";
 
-    const isValid = verifyWebhookSignature(
-      rawBody,
-      pipeline.webhook_secret,
-      signature,
-      timestamp
-    );
+    const isValid = verifyWebhookSignature(rawBody, pipeline.webhook_secret, signature, timestamp);
 
     if (!isValid) {
       return res.status(401).json({

@@ -110,9 +110,7 @@ export async function findPipelineBySourceKey(sourceKey: string) {
     WHERE pipeline_id = $1 AND is_active = TRUE
     ORDER BY created_at ASC;
   `;
-  const subscribersResult = await pool.query(subscribersQuery, [
-    pipelineResult.rows[0].id,
-  ]);
+  const subscribersResult = await pool.query(subscribersQuery, [pipelineResult.rows[0].id]);
 
   return {
     ...pipelineResult.rows[0],

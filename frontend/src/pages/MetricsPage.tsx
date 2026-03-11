@@ -1,13 +1,7 @@
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
 import StatCard from "../components/StatCard";
-import {
-  CheckCircle2,
-  Clock3,
-  Send,
-  Server,
-  XCircle,
-} from "lucide-react";
+import { CheckCircle2, Clock3, Send, Server, XCircle } from "lucide-react";
 import { getMetrics } from "../api/client";
 import type { MetricsResponse } from "../types";
 
@@ -49,30 +43,15 @@ export default function MetricsPage() {
       ) : (
         <>
           <div className="stats-grid">
-            <StatCard
-              title="Total Pipelines"
-              value={data.pipelines}
-              icon={Server}
-              tone="pink"
-            />
+            <StatCard title="Total Pipelines" value={data.pipelines} icon={Server} tone="pink" />
             <StatCard
               title="Processed Jobs"
               value={data.jobs_processed}
               icon={CheckCircle2}
               tone="green"
             />
-            <StatCard
-              title="Failed Jobs"
-              value={data.jobs_failed}
-              icon={XCircle}
-              tone="red"
-            />
-            <StatCard
-              title="Delivered"
-              value={data.deliveries_sent}
-              icon={Send}
-              tone="blue"
-            />
+            <StatCard title="Failed Jobs" value={data.jobs_failed} icon={XCircle} tone="red" />
+            <StatCard title="Delivered" value={data.deliveries_sent} icon={Send} tone="blue" />
             <StatCard
               title="Failed Deliveries"
               value={data.deliveries_failed}
@@ -90,9 +69,9 @@ export default function MetricsPage() {
           <div className="cute-card big-card">
             <h2>Metrics Summary</h2>
             <p className="muted">
-              This page reads real aggregated values from the backend metrics endpoint.
-              It summarizes how many pipelines belong to the current user, how many jobs
-              were processed or failed, and how subscriber deliveries are performing.
+              This page reads real aggregated values from the backend metrics endpoint. It
+              summarizes how many pipelines belong to the current user, how many jobs were processed
+              or failed, and how subscriber deliveries are performing.
             </p>
 
             <p className="muted" style={{ marginTop: "12px" }}>

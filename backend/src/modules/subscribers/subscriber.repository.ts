@@ -28,10 +28,7 @@ export async function getSubscribersByPipelineId(pipelineId: string) {
   return result.rows;
 }
 
-export async function deleteSubscriberById(
-  pipelineId: string,
-  subscriberId: string
-) {
+export async function deleteSubscriberById(pipelineId: string, subscriberId: string) {
   const query = `
     DELETE FROM pipeline_subscribers
     WHERE id = $1 AND pipeline_id = $2

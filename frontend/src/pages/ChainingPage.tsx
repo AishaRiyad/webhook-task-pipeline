@@ -170,7 +170,10 @@ export default function ChainingPage() {
                             <span className="arrow">→</span>
                             <div className="chain-target-box chain-target-row">
                               <div>
-                                <strong>{link.target_pipeline_name || getPipelineName(link.target_pipeline_id)}</strong>
+                                <strong>
+                                  {link.target_pipeline_name ||
+                                    getPipelineName(link.target_pipeline_id)}
+                                </strong>
                                 <p className="muted small-text">
                                   Action: {link.target_pipeline_action_type || "Unknown"}
                                 </p>

@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import Layout from "../components/Layout";
 import StatCard from "../components/StatCard";
 import { Activity, CheckCircle2, Clock3, Server, XCircle, RefreshCcw } from "lucide-react";
-import { getJobs, getPipelineLinks, getPipelines } from "../api/client";
-import type { Job, Pipeline, PipelineLink } from "../types";
+import { getJobs, getPipelines } from "../api/client";
+import type { Job, Pipeline } from "../types";
 
 export default function DashboardPage() {
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
@@ -47,11 +47,31 @@ export default function DashboardPage() {
       ) : (
         <>
           <div className="stats-grid">
-            <StatCard title="Total Pipelines" value={summary.totalPipelines} icon={Server} tone="pink" />
+            <StatCard
+              title="Total Pipelines"
+              value={summary.totalPipelines}
+              icon={Server}
+              tone="pink"
+            />
             <StatCard title="Total Jobs" value={summary.totalJobs} icon={Activity} tone="blue" />
-            <StatCard title="Completed Jobs" value={summary.completedJobs} icon={CheckCircle2} tone="green" />
-            <StatCard title="Pending Jobs" value={summary.pendingJobs} icon={Clock3} tone="yellow" />
-            <StatCard title="Processing Jobs" value={summary.processingJobs} icon={RefreshCcw} tone="purple" />
+            <StatCard
+              title="Completed Jobs"
+              value={summary.completedJobs}
+              icon={CheckCircle2}
+              tone="green"
+            />
+            <StatCard
+              title="Pending Jobs"
+              value={summary.pendingJobs}
+              icon={Clock3}
+              tone="yellow"
+            />
+            <StatCard
+              title="Processing Jobs"
+              value={summary.processingJobs}
+              icon={RefreshCcw}
+              tone="purple"
+            />
             <StatCard title="Failed Jobs" value={summary.failedJobs} icon={XCircle} tone="red" />
           </div>
 

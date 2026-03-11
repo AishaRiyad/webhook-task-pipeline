@@ -43,10 +43,7 @@ export async function findDeliveriesByJobId(jobId: string, userId: string) {
   return result.rows;
 }
 
-export async function findDeliveryAttemptLogsByJobId(
-  jobId: string,
-  userId: string
-) {
+export async function findDeliveryAttemptLogsByJobId(jobId: string, userId: string) {
   const query = `
     SELECT
       dal.*,

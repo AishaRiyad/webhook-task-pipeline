@@ -1,5 +1,16 @@
 import { NavLink } from "react-router-dom";
-import { Bell, BarChart3, Boxes, GitBranch, Home, LogOut, Radio, ShieldCheck, Users, Workflow } from "lucide-react";
+import {
+  Bell,
+  BarChart3,
+  Boxes,
+  GitBranch,
+  Home,
+  LogOut,
+  Radio,
+  ShieldCheck,
+  Users,
+  Workflow,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import { useEffect, useState, type ReactNode } from "react";
 import { getUnreadNotificationsCount } from "../api/client";
@@ -18,7 +29,9 @@ export default function Layout({ children }: Props) {
       try {
         const res = await getUnreadNotificationsCount();
         setNotificationCount(res.unread_count);
-      } catch {}
+      } catch {
+        return;
+      }
     }
 
     loadCount();
@@ -84,9 +97,7 @@ export default function Layout({ children }: Props) {
             <span>Notifications</span>
 
             {notificationCount > 0 && (
-              <span className="notification-badge">
-                {notificationCount}
-              </span>
+              <span className="notification-badge">{notificationCount}</span>
             )}
           </NavLink>
         </nav>

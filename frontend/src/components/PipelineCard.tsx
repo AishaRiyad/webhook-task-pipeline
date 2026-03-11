@@ -7,12 +7,7 @@ type Props = {
   onDeleteLink?: (sourcePipelineId: string, targetPipelineId: string) => void;
 };
 
-export default function PipelineCard({
-  pipeline,
-  links = [],
-  onDelete,
-  onDeleteLink,
-}: Props) {
+export default function PipelineCard({ pipeline, links = [], onDelete, onDeleteLink }: Props) {
   return (
     <div className="cute-card">
       <div className="row-between">
@@ -34,16 +29,12 @@ export default function PipelineCard({
           <div className="link-list">
             {links.map((link) => (
               <div key={link.id} className="link-row">
-                <span className="chip">
-                  {link.target_pipeline_name || link.target_pipeline_id}
-                </span>
+                <span className="chip">{link.target_pipeline_name || link.target_pipeline_id}</span>
 
                 {onDeleteLink && (
                   <button
                     className="mini-danger-btn"
-                    onClick={() =>
-                      onDeleteLink(pipeline.id, link.target_pipeline_id)
-                    }
+                    onClick={() => onDeleteLink(pipeline.id, link.target_pipeline_id)}
                   >
                     Remove Link
                   </button>

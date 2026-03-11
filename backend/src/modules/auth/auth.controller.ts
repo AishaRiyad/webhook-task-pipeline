@@ -7,12 +7,7 @@ import {
   refreshUserToken,
   registerUser,
 } from "./auth.service";
-import {
-  loginSchema,
-  logoutSchema,
-  refreshSchema,
-  registerSchema,
-} from "./auth.types";
+import { loginSchema, logoutSchema, refreshSchema, registerSchema } from "./auth.types";
 import { AuthenticatedRequest } from "../../shared/middleware/authMiddleware";
 
 export async function registerHandler(req: Request, res: Response) {

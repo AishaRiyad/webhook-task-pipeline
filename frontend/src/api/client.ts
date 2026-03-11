@@ -1,7 +1,5 @@
 import type {
-  DeliveryAttemptLog,
   Job,
-  JobDelivery,
   JobDetailsResponse,
   LoginResponse,
   MetricsResponse,
@@ -116,21 +114,15 @@ export async function getPipelineSubscribers(pipelineId: string) {
 }
 
 export async function addPipelineSubscriber(pipelineId: string, targetUrl: string) {
-  return request<{ message: string; data: Subscriber }>(
-    `/pipelines/${pipelineId}/subscribers`,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        target_url: targetUrl,
-      }),
-    }
-  );
+  return request<{ message: string; data: Subscriber }>(`/pipelines/${pipelineId}/subscribers`, {
+    method: "POST",
+    body: JSON.stringify({
+      target_url: targetUrl,
+    }),
+  });
 }
 
-export async function deletePipelineSubscriber(
-  pipelineId: string,
-  subscriberId: string
-) {
+export async function deletePipelineSubscriber(pipelineId: string, subscriberId: string) {
   return request<{ message: string; data: Subscriber }>(
     `/pipelines/${pipelineId}/subscribers/${subscriberId}`,
     {

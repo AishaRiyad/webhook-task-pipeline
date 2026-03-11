@@ -1,29 +1,59 @@
+import { randomUUID } from "crypto";
+
 import { pool } from "../db/database";
 import { createDeliveriesForJob } from "../modules/deliveries/delivery.service";
-import { randomUUID } from "crypto";
 import { findLinkedTargetPipelines } from "../modules/pipelines/pipelineLink.repository";
-import {
-  createJobRecord,
-  createWebhookEventRecord,
-} from "../modules/webhooks/webhook.repository";
+import { createJobRecord, createWebhookEventRecord } from "../modules/webhooks/webhook.repository";
 import { sendFailureNotification } from "../shared/utils/failureNotifier";
 
 const WORKER_NAME = process.env.WORKER_NAME || "job-worker";
 
 const parsedPollInterval = Number(process.env.WORKER_POLL_INTERVAL_MS);
 const POLL_INTERVAL_MS =
-  Number.isFinite(parsedPollInterval) && parsedPollInterval > 0
-    ? parsedPollInterval
-    : 2000;
+  Number.isFinite(parsedPollInterval) && parsedPollInterval > 0 ? parsedPollInterval : 2000;
+
+type JsonObject = Record<string, unknown>;
+
+type JobRow = {
+  id: string;
+  pipeline_id: string;
+  webhook_event_id: string;
+  status: string;
+};
+
+type PipelineActionConfig = {
+  force_fail?: boolean;
+  group_by_field?: string;
+  value_field?: string;
+  target_field?: string;
+  id_field?: string;
+  fields?: string[];
+  field?: string;
+  value?: unknown;
+};
+
+type PipelineRow = {
+  id: string;
+  user_id: string;
+  action_type: string;
+  action_config: PipelineActionConfig | null;
+};
+
+type WebhookEventRow = {
+  id: string;
+  pipeline_id: string;
+  payload: JsonObject;
+};
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function enqueueChainedJobs(
-  sourceJob: any,
-  processedPayload: Record<string, unknown>
-) {
+async function enqueueChainedJobs(sourceJob: JobRow, processedPayload: Record<string, unknown>) {
   const targetPipelines = await findLinkedTargetPipelines(sourceJob.pipeline_id);
 
   for (const targetPipeline of targetPipelines) {
@@ -47,7 +77,7 @@ async function enqueueChainedJobs(
   }
 }
 
-async function fetchNextJob() {
+async function fetchNextJob(): Promise<JobRow | null> {
   const client = await pool.connect();
 
   try {
@@ -68,7 +98,7 @@ async function fetchNextJob() {
       return null;
     }
 
-    const job = result.rows[0];
+    const job = result.rows[0] as JobRow;
 
     await client.query(
       `
@@ -90,8 +120,8 @@ async function fetchNextJob() {
   }
 }
 
-async function processJob(job: any) {
-  let pipeline: any = null;
+async function processJob(job: JobRow) {
+  let pipeline: PipelineRow | null = null;
 
   try {
     console.log(`[${WORKER_NAME}] Processing job: ${job.id}`);
@@ -105,7 +135,7 @@ async function processJob(job: any) {
       [job.webhook_event_id]
     );
 
-    const event = eventResult.rows[0];
+    const event = eventResult.rows[0] as WebhookEventRow | undefined;
     if (!event) {
       throw new Error(`Webhook event not found for job ${job.id}`);
     }
@@ -119,12 +149,13 @@ async function processJob(job: any) {
       [job.pipeline_id]
     );
 
-    pipeline = pipelineResult.rows[0];
+    pipeline = (pipelineResult.rows[0] as PipelineRow | undefined) ?? null;
     if (!pipeline) {
       throw new Error(`Pipeline not found for job ${job.id}`);
     }
 
-    let processedPayload = event.payload;
+    const eventPayload: JsonObject = isJsonObject(event.payload) ? event.payload : {};
+    let processedPayload: JsonObject | null = eventPayload;
     let shouldSkipJob = false;
     let skipReason: string | null = null;
 
@@ -141,8 +172,10 @@ async function processJob(job: any) {
         throw new Error("Invalid running_sum configuration");
       }
 
-      const groupKey = String(event.payload?.[groupField]);
-      const value = Number(event.payload?.[valueField]);
+      /* eslint-disable-next-line security/detect-object-injection */
+      const groupKey = String(eventPayload[groupField]);
+      /* eslint-disable-next-line security/detect-object-injection */
+      const value = Number(eventPayload[valueField]);
 
       if (!groupKey || Number.isNaN(value)) {
         throw new Error("Invalid aggregation payload values");
@@ -157,7 +190,7 @@ async function processJob(job: any) {
         [pipeline.id, groupKey]
       );
 
-      let newTotal;
+      let newTotal: number;
 
       if (existing.rows.length === 0) {
         newTotal = value;
@@ -190,7 +223,7 @@ async function processJob(job: any) {
       }
 
       processedPayload = {
-        ...event.payload,
+        ...eventPayload,
         [targetField]: newTotal,
       };
     }
@@ -199,7 +232,8 @@ async function processJob(job: any) {
       const idField = pipeline.action_config?.id_field;
 
       if (idField) {
-        const eventId = event.payload?.[idField];
+        /* eslint-disable-next-line security/detect-object-injection */
+        const eventId = eventPayload[idField];
 
         if (eventId) {
           const duplicateCheck = await pool.query(
@@ -216,9 +250,7 @@ async function processJob(job: any) {
           const count = Number(duplicateCheck.rows[0].count);
 
           if (count > 0) {
-            console.log(
-              `[${WORKER_NAME}] Duplicate event detected for ${eventId}`
-            );
+            console.log(`[${WORKER_NAME}] Duplicate event detected for ${eventId}`);
 
             shouldSkipJob = true;
             skipReason = `Duplicate event detected for ${eventId}`;
@@ -233,8 +265,9 @@ async function processJob(job: any) {
       const transformed: Record<string, unknown> = {};
 
       for (const field of fields) {
-        if (field in event.payload) {
-          transformed[field] = event.payload[field];
+        if (field in eventPayload) {
+          /* eslint-disable-next-line security/detect-object-injection */
+          transformed[field] = eventPayload[field];
         }
       }
 
@@ -243,7 +276,7 @@ async function processJob(job: any) {
 
     if (pipeline.action_type === "enrich") {
       processedPayload = {
-        ...event.payload,
+        ...eventPayload,
         processed_at: new Date().toISOString(),
       };
     }
@@ -252,8 +285,11 @@ async function processJob(job: any) {
       const field = pipeline.action_config?.field;
       const value = pipeline.action_config?.value;
 
-      if (event.payload?.[field] !== value) {
-        processedPayload = null;
+      if (field) {
+        /* eslint-disable-next-line security/detect-object-injection */
+        if (eventPayload[field] !== value) {
+          processedPayload = null;
+        }
       }
     }
 
@@ -287,7 +323,7 @@ async function processJob(job: any) {
 
     if (processedPayload) {
       await createDeliveriesForJob(job.id, job.pipeline_id);
-      await enqueueChainedJobs(job, processedPayload as Record<string, unknown>);
+      await enqueueChainedJobs(job, processedPayload);
     }
 
     console.log(`[${WORKER_NAME}] Job completed: ${job.id}`);
@@ -315,8 +351,7 @@ async function processJob(job: any) {
           pipeline_id: job.pipeline_id,
           webhook_event_id: job.webhook_event_id,
           worker_name: WORKER_NAME,
-          error:
-            error instanceof Error ? error.message : "Unknown processing error",
+          error: error instanceof Error ? error.message : "Unknown processing error",
         },
       });
     }
@@ -326,9 +361,7 @@ async function processJob(job: any) {
 }
 
 async function workerLoop() {
-  console.log(
-    `[${WORKER_NAME}] Started. Poll interval: ${POLL_INTERVAL_MS}ms`
-  );
+  console.log(`[${WORKER_NAME}] Started. Poll interval: ${POLL_INTERVAL_MS}ms`);
 
   while (true) {
     try {

@@ -1,19 +1,13 @@
 import { Response } from "express";
 import { AuthenticatedRequest } from "../../shared/middleware/authMiddleware";
-import {
-  getUserNotifications,
-  readNotification,
-} from "./notification.service";
+import { getUserNotifications, readNotification } from "./notification.service";
 import { getUnreadNotificationsCount } from "./notification.service";
 
 type NotificationParams = {
   id: string;
 };
 
-export async function getNotificationsHandler(
-  req: AuthenticatedRequest,
-  res: Response
-) {
+export async function getNotificationsHandler(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) {
       return res.status(401).json({
@@ -45,10 +39,7 @@ export async function markNotificationAsReadHandler(
       });
     }
 
-    const notification = await readNotification(
-      req.params.id,
-      req.user.userId
-    );
+    const notification = await readNotification(req.params.id, req.user.userId);
 
     if (!notification) {
       return res.status(404).json({
@@ -68,10 +59,7 @@ export async function markNotificationAsReadHandler(
   }
 }
 
-export async function getUnreadNotificationsCountHandler(
-  req: AuthenticatedRequest,
-  res: Response
-) {
+export async function getUnreadNotificationsCountHandler(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) {
       return res.status(401).json({

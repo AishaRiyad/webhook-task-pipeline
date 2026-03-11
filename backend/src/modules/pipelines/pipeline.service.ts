@@ -77,7 +77,6 @@ export async function removePipelineById(id: string, userId: string) {
   return deletePipelineById(id, userId);
 }
 
-
 function willCreateCycle(
   links: Array<{ source_pipeline_id: string; target_pipeline_id: string }>,
   sourcePipelineId: string,

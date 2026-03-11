@@ -22,11 +22,7 @@ export async function findUserById(id: string) {
   return result.rows[0] || null;
 }
 
-export async function createUser(data: {
-  id: string;
-  email: string;
-  password_hash: string;
-}) {
+export async function createUser(data: { id: string; email: string; password_hash: string }) {
   const query = `
     INSERT INTO users (id, email, password_hash)
     VALUES ($1, $2, $3)

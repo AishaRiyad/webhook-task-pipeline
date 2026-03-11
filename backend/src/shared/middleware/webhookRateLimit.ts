@@ -10,15 +10,10 @@ const store = new Map<string, RateLimitEntry>();
 const parsedWindowMs = Number(process.env.WEBHOOK_RATE_LIMIT_WINDOW_MS);
 const parsedMaxRequests = Number(process.env.WEBHOOK_RATE_LIMIT_MAX_REQUESTS);
 
-const WINDOW_MS =
-  Number.isFinite(parsedWindowMs) && parsedWindowMs > 0
-    ? parsedWindowMs
-    : 60000;
+const WINDOW_MS = Number.isFinite(parsedWindowMs) && parsedWindowMs > 0 ? parsedWindowMs : 60000;
 
 const MAX_REQUESTS =
-  Number.isFinite(parsedMaxRequests) && parsedMaxRequests > 0
-    ? parsedMaxRequests
-    : 10;
+  Number.isFinite(parsedMaxRequests) && parsedMaxRequests > 0 ? parsedMaxRequests : 10;
 
 function cleanupExpiredEntries(now: number) {
   for (const [key, value] of store.entries()) {
@@ -30,22 +25,15 @@ function cleanupExpiredEntries(now: number) {
 
 function getSourceKey(req: Request): string {
   const routeSourceKey =
-    typeof req.params?.sourceKey === "string"
-      ? req.params.sourceKey
-      : "unknown-source";
+    typeof req.params?.sourceKey === "string" ? req.params.sourceKey : "unknown-source";
 
   const forwardedFor = req.header("x-forwarded-for");
-  const clientIp =
-    forwardedFor?.split(",")[0]?.trim() || req.ip || "unknown-ip";
+  const clientIp = forwardedFor?.split(",")[0]?.trim() || req.ip || "unknown-ip";
 
   return `${routeSourceKey}:${clientIp}`;
 }
 
-export function webhookRateLimit(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
+export function webhookRateLimit(req: Request, res: Response, next: NextFunction) {
   const now = Date.now();
   cleanupExpiredEntries(now);
 
@@ -96,10 +84,7 @@ export function webhookRateLimit(
   store.set(sourceKey, current);
 
   res.setHeader("X-RateLimit-Limit", MAX_REQUESTS.toString());
-  res.setHeader(
-    "X-RateLimit-Remaining",
-    (MAX_REQUESTS - current.count).toString()
-  );
+  res.setHeader("X-RateLimit-Remaining", (MAX_REQUESTS - current.count).toString());
 
   next();
 }

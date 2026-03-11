@@ -12,9 +12,7 @@ type NotificationPayload = {
   details: Record<string, unknown>;
 };
 
-export async function sendFailureNotification(
-  payload: NotificationPayload
-) {
+export async function sendFailureNotification(payload: NotificationPayload) {
   try {
     await createSystemNotification({
       user_id: payload.user_id,

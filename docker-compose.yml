@@ -20,7 +20,7 @@ services:
       retries: 10
 
   db_init:
-    build: .
+    build: ./backend
     depends_on:
       postgres:
         condition: service_healthy
@@ -33,7 +33,7 @@ services:
     command: npm run db:init
 
   api:
-    build: .
+    build: ./backend
     container_name: webhook_pipeline_api
     depends_on:
       postgres:
@@ -49,10 +49,11 @@ services:
       DB_NAME: webhook_pipeline
       DB_USER: postgres
       DB_PASSWORD: postgres
+      FAILURE_NOTIFICATION_URL: http://api:3000/subscriber-notification-service
     command: npm run dev
 
   job_worker:
-    build: .
+    build: ./backend
     container_name: webhook_pipeline_worker
     depends_on:
       postgres:
@@ -65,10 +66,11 @@ services:
       DB_NAME: webhook_pipeline
       DB_USER: postgres
       DB_PASSWORD: postgres
+      FAILURE_NOTIFICATION_URL: http://api:3000/subscriber-notification-service
     command: npm run worker
 
   delivery_worker:
-    build: .
+    build: ./backend
     container_name: webhook_pipeline_delivery_worker
     depends_on:
       postgres:
@@ -81,7 +83,16 @@ services:
       DB_NAME: webhook_pipeline
       DB_USER: postgres
       DB_PASSWORD: postgres
+      FAILURE_NOTIFICATION_URL: http://api:3000/subscriber-notification-service
     command: npm run worker:delivery
+
+  frontend:
+    build: ./frontend
+    container_name: webhook_pipeline_frontend
+    depends_on:
+      - api
+    ports:
+      - "5173:80"
 
 volumes:
   postgres_data:

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Layout from "../components/Layout";
 import {
   addPipelineSubscriber,
@@ -17,7 +17,7 @@ export default function SubscribersPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  async function loadPipelines() {
+  const loadPipelines = useCallback(async () => {
     try {
       const pipelineRes = await getPipelines();
       const loadedPipelines = pipelineRes.data || [];
@@ -31,7 +31,7 @@ export default function SubscribersPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [selectedPipelineId]);
 
   async function loadSubscribers(pipelineId: string) {
     if (!pipelineId) {
@@ -49,7 +49,7 @@ export default function SubscribersPage() {
 
   useEffect(() => {
     loadPipelines();
-  }, []);
+  }, [loadPipelines]);
 
   useEffect(() => {
     if (selectedPipelineId) {

@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
-import {
-  getNotifications,
-  markNotificationAsRead,
-} from "../api/client";
+import { getNotifications, markNotificationAsRead } from "../api/client";
 import type { SystemNotification } from "../types";
 
 export default function NotificationsPage() {
@@ -16,9 +13,7 @@ export default function NotificationsPage() {
       const response = await getNotifications();
       setNotifications(response.data || []);
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Failed to load notifications"
-      );
+      setMessage(error instanceof Error ? error.message : "Failed to load notifications");
     } finally {
       setLoading(false);
     }
@@ -34,11 +29,7 @@ export default function NotificationsPage() {
       await loadNotifications();
       window.location.reload();
     } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Failed to mark notification as read"
-      );
+      setMessage(error instanceof Error ? error.message : "Failed to mark notification as read");
     }
   }
 
@@ -69,18 +60,14 @@ export default function NotificationsPage() {
                 </div>
                 <span
                   className={`badge ${
-                    notification.type === "job_failed"
-                      ? "badge-red"
-                      : "badge-yellow"
+                    notification.type === "job_failed" ? "badge-red" : "badge-yellow"
                   }`}
                 >
                   {notification.type}
                 </span>
               </div>
 
-              <p className="muted">
-                Created: {new Date(notification.created_at).toLocaleString()}
-              </p>
+              <p className="muted">Created: {new Date(notification.created_at).toLocaleString()}</p>
 
               <div className="json-box">
                 <strong>Payload</strong>

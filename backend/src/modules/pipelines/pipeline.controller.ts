@@ -9,10 +9,7 @@ import {
   removePipelineById,
   removePipelineLink,
 } from "./pipeline.service";
-import {
-  createPipelineLinkSchema,
-  createPipelineSchema,
-} from "./pipeline.types";
+import { createPipelineLinkSchema, createPipelineSchema } from "./pipeline.types";
 import { AuthenticatedRequest } from "../../shared/middleware/authMiddleware";
 
 type PipelineParams = {
@@ -24,10 +21,7 @@ type PipelineLinkParams = {
   targetPipelineId: string;
 };
 
-export async function createPipelineHandler(
-  req: AuthenticatedRequest,
-  res: Response
-) {
+export async function createPipelineHandler(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) {
       return res.status(401).json({
@@ -57,10 +51,7 @@ export async function createPipelineHandler(
   }
 }
 
-export async function getAllPipelinesHandler(
-  req: AuthenticatedRequest,
-  res: Response
-) {
+export async function getAllPipelinesHandler(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) {
       return res.status(401).json({
@@ -141,7 +132,6 @@ export async function deletePipelineHandler(
     });
   }
 }
-
 
 export async function createPipelineLinkHandler(
   req: AuthenticatedRequest & { params: PipelineParams },

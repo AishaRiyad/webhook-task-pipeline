@@ -26,10 +26,7 @@ export async function addSubscriberToPipeline(
   return subscriber;
 }
 
-export async function listPipelineSubscribers(
-  pipelineId: string,
-  userId: string
-) {
+export async function listPipelineSubscribers(pipelineId: string, userId: string) {
   const pipeline = await findPipelineById(pipelineId, userId);
 
   if (!pipeline) {

@@ -1,4 +1,3 @@
-
 import { Router } from "express";
 import {
   loginHandler,
@@ -10,7 +9,6 @@ import {
 import { authenticate } from "../../shared/middleware/authMiddleware";
 
 const router = Router();
-
 
 /**
  * @swagger
@@ -57,4 +55,3 @@ router.post("/logout", logoutHandler);
 router.get("/me", authenticate, meHandler);
 
 export default router;
-

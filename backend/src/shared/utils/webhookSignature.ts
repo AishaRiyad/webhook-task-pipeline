@@ -1,6 +1,6 @@
 import crypto from "crypto";
 
-const SIGNATURE_TOLERANCE_SECONDS = 300; 
+const SIGNATURE_TOLERANCE_SECONDS = 300;
 
 export function generateWebhookSignature(
   rawBody: string,
@@ -9,10 +9,7 @@ export function generateWebhookSignature(
 ): string {
   const signedPayload = `${timestamp}.${rawBody}`;
 
-  return crypto
-    .createHmac("sha256", secret)
-    .update(signedPayload)
-    .digest("hex");
+  return crypto.createHmac("sha256", secret).update(signedPayload).digest("hex");
 }
 
 export function verifyWebhookSignature(
@@ -36,11 +33,7 @@ export function verifyWebhookSignature(
     return false;
   }
 
-  const expectedSignature = generateWebhookSignature(
-    rawBody,
-    secret,
-    timestamp
-  );
+  const expectedSignature = generateWebhookSignature(rawBody, secret, timestamp);
 
   const expectedBuffer = Buffer.from(expectedSignature, "hex");
   const receivedBuffer = Buffer.from(receivedSignature, "hex");

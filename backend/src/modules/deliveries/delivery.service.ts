@@ -77,9 +77,7 @@ export async function processPendingDeliveries() {
         request_payload: job.result_payload,
         response_status: response.status,
         response_body:
-          typeof response.data === "string"
-            ? response.data
-            : JSON.stringify(response.data),
+          typeof response.data === "string" ? response.data : JSON.stringify(response.data),
         error_message: null,
       });
 
@@ -122,8 +120,7 @@ export async function processPendingDeliveries() {
         }
       }
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unknown delivery error";
+      const message = error instanceof Error ? error.message : "Unknown delivery error";
 
       await createDeliveryAttemptLog({
         id: randomUUID(),

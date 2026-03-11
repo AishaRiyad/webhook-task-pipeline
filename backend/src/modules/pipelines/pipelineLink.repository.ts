@@ -48,10 +48,7 @@ export async function findLinkedTargetPipelines(sourcePipelineId: string) {
   return result.rows;
 }
 
-export async function deletePipelineLinkRecord(
-  sourcePipelineId: string,
-  targetPipelineId: string
-) {
+export async function deletePipelineLinkRecord(sourcePipelineId: string, targetPipelineId: string) {
   const query = `
     DELETE FROM pipeline_links
     WHERE source_pipeline_id = $1 AND target_pipeline_id = $2
@@ -62,10 +59,7 @@ export async function deletePipelineLinkRecord(
   return result.rows[0] || null;
 }
 
-export async function findPipelineLink(
-  sourcePipelineId: string,
-  targetPipelineId: string
-) {
+export async function findPipelineLink(sourcePipelineId: string, targetPipelineId: string) {
   const query = `
     SELECT *
     FROM pipeline_links

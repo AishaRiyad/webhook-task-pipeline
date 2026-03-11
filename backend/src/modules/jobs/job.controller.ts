@@ -6,10 +6,7 @@ type JobParams = {
   id: string;
 };
 
-export async function getAllJobsHandler(
-  req: AuthenticatedRequest,
-  res: Response
-) {
+export async function getAllJobsHandler(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) {
       return res.status(401).json({

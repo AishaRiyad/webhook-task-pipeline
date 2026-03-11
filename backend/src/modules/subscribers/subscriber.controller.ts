@@ -73,10 +73,7 @@ export async function getSubscribersHandler(
       });
     }
 
-    const subscribers = await listPipelineSubscribers(
-      req.params.id,
-      req.user.userId
-    );
+    const subscribers = await listPipelineSubscribers(req.params.id, req.user.userId);
 
     if (!subscribers) {
       return res.status(404).json({

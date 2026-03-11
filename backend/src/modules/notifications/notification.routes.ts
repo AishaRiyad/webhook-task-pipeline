@@ -1,8 +1,5 @@
 import { Router } from "express";
-import {
-  getNotificationsHandler,
-  markNotificationAsReadHandler,
-} from "./notification.controller";
+import { getNotificationsHandler, markNotificationAsReadHandler } from "./notification.controller";
 import { getUnreadNotificationsCountHandler } from "./notification.controller";
 
 const router = Router();

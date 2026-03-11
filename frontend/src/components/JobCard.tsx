@@ -19,15 +19,10 @@ export default function JobCard({ job, pipelines }: Props) {
 
       <p className="muted">Job ID: {job.id}</p>
       <p className="muted">Attempts: {job.attempts}</p>
-      <p className="muted">
-        Created: {new Date(job.created_at).toLocaleString()}
-      </p>
+      <p className="muted">Created: {new Date(job.created_at).toLocaleString()}</p>
 
       <div className="card-actions">
-        <button
-          className="secondary-btn"
-          onClick={() => navigate(`/jobs/${job.id}`)}
-        >
+        <button className="secondary-btn" onClick={() => navigate(`/jobs/${job.id}`)}>
           View Details
         </button>
       </div>

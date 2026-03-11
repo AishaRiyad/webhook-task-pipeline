@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { signup } from "../api/client";
 import { motion } from "framer-motion";
-import { LockKeyhole, Mail, Sparkles, UserPlus } from "lucide-react";
+import { LockKeyhole, Mail, Sparkles } from "lucide-react";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");

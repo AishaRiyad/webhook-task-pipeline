@@ -47,7 +47,7 @@ export default function LoginPage() {
         <div className="login-top">
           <div className="login-badge">
             <Sparkles size={16} />
-            🌸 Your Journey Starts Here 🌷💗 
+            🌸 Your Journey Starts Here 🌷💗
           </div>
           <h1>Welcome to Sweet Pipeline</h1>
           <p>Login to explore pipelines, jobs, and chaining dashboard.</p>

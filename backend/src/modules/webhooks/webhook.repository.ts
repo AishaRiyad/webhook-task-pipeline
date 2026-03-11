@@ -35,12 +35,7 @@ export async function createJobRecord(data: {
     RETURNING *;
   `;
 
-  const values = [
-    data.id,
-    data.pipeline_id,
-    data.webhook_event_id,
-    data.status,
-  ];
+  const values = [data.id, data.pipeline_id, data.webhook_event_id, data.status];
 
   const result = await pool.query(query, values);
   return result.rows[0];

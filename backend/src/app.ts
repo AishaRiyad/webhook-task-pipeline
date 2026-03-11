@@ -12,7 +12,6 @@ import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./config/swagger";
 import notificationRoutes from "./modules/notifications/notification.routes";
 
-
 const app = express();
 
 app.use(
@@ -24,7 +23,7 @@ app.use(
 
 app.use(
   express.json({
-    verify: (req: any, _res, buf) => {
+    verify: (req: express.Request & { rawBody?: string }, _res, buf) => {
       req.rawBody = buf.toString("utf8");
     },
   })

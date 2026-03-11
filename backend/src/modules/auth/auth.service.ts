@@ -10,24 +10,15 @@ import {
   findUserByEmail,
   findUserById,
 } from "./auth.repository";
-import {
-  JwtPayload,
-  LoginInput,
-  LogoutInput,
-  RefreshInput,
-  RegisterInput,
-} from "./auth.types";
-
+import { JwtPayload, LoginInput, LogoutInput, RefreshInput, RegisterInput } from "./auth.types";
 
 type TokenExpiry = "15m" | "7d" | "1h" | "30m";
 
 const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || "access_secret";
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "refresh_secret";
-const ACCESS_EXPIRES_IN: TokenExpiry =
-  (process.env.JWT_ACCESS_EXPIRES_IN as TokenExpiry) || "15m";
+const ACCESS_EXPIRES_IN: TokenExpiry = (process.env.JWT_ACCESS_EXPIRES_IN as TokenExpiry) || "15m";
 
-const REFRESH_EXPIRES_IN: TokenExpiry =
-  (process.env.JWT_REFRESH_EXPIRES_IN as TokenExpiry) || "7d";
+const REFRESH_EXPIRES_IN: TokenExpiry = (process.env.JWT_REFRESH_EXPIRES_IN as TokenExpiry) || "7d";
 
 function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
