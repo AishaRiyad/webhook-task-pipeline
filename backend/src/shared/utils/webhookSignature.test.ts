@@ -30,12 +30,7 @@ describe("webhookSignature", () => {
       status: "created",
     });
 
-    const isValid = verifyWebhookSignature(
-      rawBody,
-      secret,
-      "invalidsignature",
-      timestamp
-    );
+    const isValid = verifyWebhookSignature(rawBody, secret, "invalidsignature", timestamp);
 
     expect(isValid).toBe(false);
   });
@@ -51,12 +46,7 @@ describe("webhookSignature", () => {
 
     const signature = generateWebhookSignature(rawBody, secret, oldTimestamp);
 
-    const isValid = verifyWebhookSignature(
-      rawBody,
-      secret,
-      signature,
-      oldTimestamp
-    );
+    const isValid = verifyWebhookSignature(rawBody, secret, signature, oldTimestamp);
 
     expect(isValid).toBe(false);
   });
@@ -68,12 +58,7 @@ describe("webhookSignature", () => {
       orderId: "ORD-1003",
     });
 
-    const isValid = verifyWebhookSignature(
-      rawBody,
-      secret,
-      "abcd",
-      "not-a-number"
-    );
+    const isValid = verifyWebhookSignature(rawBody, secret, "abcd", "not-a-number");
 
     expect(isValid).toBe(false);
   });
