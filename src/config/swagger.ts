@@ -1,6 +1,5 @@
 import swaggerJsdoc from "swagger-jsdoc";
 
-
 const options: swaggerJsdoc.Options = {
   definition: {
     openapi: "3.0.0",
@@ -63,12 +62,54 @@ const options: swaggerJsdoc.Options = {
             },
             action_type: {
               type: "string",
-              enum: ["transform", "filter", "enrich"],
-              example: "enrich",
+              enum: [
+                "transform",
+                "filter",
+                "enrich",
+                "deduplicate",
+                "aggregate",
+                "running_sum",
+              ],
+              example: "running_sum",
             },
             action_config: {
               type: "object",
-              example: {},
+              description: "Configuration for the selected action type",
+              examples: {
+                transform: {
+                  value: {
+                    fields: ["orderId", "status"],
+                  },
+                },
+                filter: {
+                  value: {
+                    field: "status",
+                    value: "created",
+                  },
+                },
+                enrich: {
+                  value: {},
+                },
+                deduplicate: {
+                  value: {
+                    id_field: "eventId",
+                  },
+                },
+                aggregate: {
+                  value: {
+                    field: "items",
+                    operation: "count",
+                    target_field: "item_count",
+                  },
+                },
+                running_sum: {
+                  value: {
+                    group_by_field: "customerId",
+                    value_field: "amount",
+                    target_field: "running_total",
+                  },
+                },
+              },
             },
             subscribers: {
               type: "array",
@@ -121,6 +162,67 @@ const options: swaggerJsdoc.Options = {
             timestamp: {
               type: "string",
               example: "2026-03-10T12:00:00.000Z",
+            },
+          },
+        },
+        SystemNotification: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              example: "b71dba3f-7a2e-4d54-9bdf-123456789abc",
+            },
+            user_id: {
+              type: "string",
+              example: "5c9c9e8a-2d3e-4b1b-a111-abc123456789",
+            },
+            type: {
+              type: "string",
+              example: "job_failed",
+            },
+            title: {
+              type: "string",
+              example: "Job Processing Failed",
+            },
+            message: {
+              type: "string",
+              example: "Job failed during pipeline processing",
+            },
+            payload: {
+              type: "object",
+              example: {
+                job_id: "123",
+                pipeline_id: "456",
+                error: "Invalid configuration",
+              },
+            },
+            is_read: {
+              type: "boolean",
+              example: false,
+            },
+            created_at: {
+              type: "string",
+              format: "date-time",
+            },
+          },
+        },
+        NotificationCountResponse: {
+          type: "object",
+          properties: {
+            unread_count: {
+              type: "number",
+              example: 2,
+            },
+          },
+        },
+        NotificationListResponse: {
+          type: "object",
+          properties: {
+            data: {
+              type: "array",
+              items: {
+                $ref: "#/components/schemas/SystemNotification",
+              },
             },
           },
         },

@@ -10,6 +10,7 @@ import { authenticate } from "./shared/middleware/authMiddleware";
 import cors from "cors";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./config/swagger";
+import notificationRoutes from "./modules/notifications/notification.routes";
 
 
 const app = express();
@@ -72,5 +73,6 @@ app.use("/webhooks", webhookRoutes);
 app.use("/pipelines/:id/subscribers", authenticate, subscriberRoutes);
 app.use("/jobs", authenticate, jobRoutes);
 app.use("/metrics", authenticate, metricsRoutes);
+app.use("/notifications", authenticate, notificationRoutes);
 
 export default app;
