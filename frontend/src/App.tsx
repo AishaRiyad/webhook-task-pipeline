@@ -1,5 +1,5 @@
 import React from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -11,11 +11,7 @@ import WebhookTesterPage from "./pages/WebhookTesterPage";
 import JobDetailsPage from "./pages/JobDetailsPage";
 import MetricsPage from "./pages/MetricsPage";
 import NotificationsPage from "./pages/NotificationsPage";
-
-function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem("frontend_access_token");
-  return token ? <>{children}</> : <Navigate to="/" replace />;
-}
+import PrivateRoute from "./components/PrivateRoute";
 
 export default function App() {
   return (

@@ -10,7 +10,7 @@ import {
 } from "../api/client";
 import type { Pipeline, PipelineLink } from "../types";
 
-type ActionType = "transform" | "filter" | "enrich" | "deduplicate" | "aggregate" | "running_sum";
+type ActionType = "transform" | "filter" | "enrich" | "deduplicate" | "running_sum";
 
 export default function PipelinesPage() {
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
@@ -21,12 +21,16 @@ export default function PipelinesPage() {
   const [name, setName] = useState("");
   const [actionType, setActionType] = useState<ActionType>("enrich");
   const [subscriberUrl, setSubscriberUrl] = useState("");
+
   const [transformFields, setTransformFields] = useState("");
   const [filterField, setFilterField] = useState("");
   const [filterValue, setFilterValue] = useState("");
   const [dedupeField, setDedupeField] = useState("");
-  const [aggregateField, setAggregateField] = useState("");
-  const [runningSumField, setRunningSumField] = useState("");
+
+  const [runningSumGroupField, setRunningSumGroupField] = useState("");
+  const [runningSumValueField, setRunningSumValueField] = useState("");
+  const [runningSumTargetField, setRunningSumTargetField] = useState("");
+
   const [message, setMessage] = useState("");
 
   async function loadPipelines() {
@@ -81,15 +85,11 @@ export default function PipelinesPage() {
       };
     }
 
-    if (actionType === "aggregate") {
-      return {
-        field: aggregateField.trim(),
-      };
-    }
-
     if (actionType === "running_sum") {
       return {
-        field: runningSumField.trim(),
+        group_by_field: runningSumGroupField.trim(),
+        value_field: runningSumValueField.trim(),
+        target_field: runningSumTargetField.trim(),
       };
     }
 
@@ -120,13 +120,13 @@ export default function PipelinesPage() {
       return;
     }
 
-    if (actionType === "aggregate" && !aggregateField.trim()) {
-      setMessage("Please enter field for aggregate action");
-      return;
-    }
-
-    if (actionType === "running_sum" && !runningSumField.trim()) {
-      setMessage("Please enter field for running sum action");
+    if (
+      actionType === "running_sum" &&
+      (!runningSumGroupField.trim() ||
+        !runningSumValueField.trim() ||
+        !runningSumTargetField.trim())
+    ) {
+      setMessage("Please enter group field, value field, and target field for running sum");
       return;
     }
 
@@ -149,8 +149,9 @@ export default function PipelinesPage() {
       setFilterField("");
       setFilterValue("");
       setDedupeField("");
-      setAggregateField("");
-      setRunningSumField("");
+      setRunningSumGroupField("");
+      setRunningSumValueField("");
+      setRunningSumTargetField("");
       setMessage("Pipeline created successfully");
 
       await loadPipelines();
@@ -218,7 +219,6 @@ export default function PipelinesPage() {
               <option value="transform">transform</option>
               <option value="filter">filter</option>
               <option value="deduplicate">deduplicate</option>
-              <option value="aggregate">aggregate</option>
               <option value="running_sum">running_sum</option>
             </select>
 
@@ -266,26 +266,30 @@ export default function PipelinesPage() {
               </>
             )}
 
-            {actionType === "aggregate" && (
-              <>
-                <label>Aggregate Field</label>
-                <input
-                  className="cute-input"
-                  value={aggregateField}
-                  onChange={(e) => setAggregateField(e.target.value)}
-                  placeholder="amount"
-                />
-              </>
-            )}
-
             {actionType === "running_sum" && (
               <>
-                <label>Running Sum Field</label>
+                <label>Group By Field</label>
                 <input
                   className="cute-input"
-                  value={runningSumField}
-                  onChange={(e) => setRunningSumField(e.target.value)}
+                  value={runningSumGroupField}
+                  onChange={(e) => setRunningSumGroupField(e.target.value)}
+                  placeholder="customerId"
+                />
+
+                <label>Value Field</label>
+                <input
+                  className="cute-input"
+                  value={runningSumValueField}
+                  onChange={(e) => setRunningSumValueField(e.target.value)}
                   placeholder="amount"
+                />
+
+                <label>Target Field</label>
+                <input
+                  className="cute-input"
+                  value={runningSumTargetField}
+                  onChange={(e) => setRunningSumTargetField(e.target.value)}
+                  placeholder="running_total"
                 />
               </>
             )}
