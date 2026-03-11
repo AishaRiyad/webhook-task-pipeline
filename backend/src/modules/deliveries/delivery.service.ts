@@ -11,11 +11,7 @@ import {
   updateDeliverySuccess,
 } from "./delivery.repository";
 import { sendFailureNotification } from "../../shared/utils/failureNotifier";
-
-function calculateNextRetry(attemptNumber: number): Date {
-  const delayInSeconds = Math.min(2 ** attemptNumber * 5, 300);
-  return new Date(Date.now() + delayInSeconds * 1000);
-}
+import { calculateNextRetry } from "../../shared/utils/retry";
 
 export async function createDeliveriesForJob(jobId: string, pipelineId: string) {
   const subscribers = await findSubscribersByPipelineId(pipelineId);

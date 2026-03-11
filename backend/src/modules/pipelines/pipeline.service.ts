@@ -1,7 +1,6 @@
 import { randomUUID } from "crypto";
+import { pool } from "../../db/database";
 import {
-  createPipelineRecord,
-  createSubscriberRecord,
   deletePipelineById,
   findAllPipelines,
   findPipelineById,
@@ -9,12 +8,12 @@ import {
 } from "./pipeline.repository";
 import { CreatePipelineInput } from "./pipeline.types";
 import {
-  createPipelineLinkRecord,
   deletePipelineLinkRecord,
   findPipelineLink,
   findPipelineLinksBySourcePipelineId,
   findPipelineLinksGraph,
 } from "./pipelineLink.repository";
+import { willCreateCycle } from "./pipelineGraph";
 
 function generateSourceKey(name: string) {
   const normalized = name
@@ -35,34 +34,66 @@ export async function createPipeline(data: CreatePipelineInput, userId: string) 
   const sourceKey = generateSourceKey(data.name);
   const webhookSecret = generateWebhookSecret();
 
-  const pipeline = await createPipelineRecord({
-    id: pipelineId,
-    user_id: userId,
-    name: data.name,
-    source_key: sourceKey,
-    webhook_secret: webhookSecret,
-    action_type: data.action_type,
-    action_config: data.action_config ?? {},
-  });
+  const client = await pool.connect();
 
-  const subscribers = [];
+  try {
+    await client.query("BEGIN");
 
-  if (data.subscribers && data.subscribers.length > 0) {
-    for (const subscriber of data.subscribers) {
-      const createdSubscriber = await createSubscriberRecord({
-        id: randomUUID(),
-        pipeline_id: pipelineId,
-        target_url: subscriber.target_url,
-      });
+    const pipelineResult = await client.query(
+      `
+      INSERT INTO pipelines (
+        id,
+        user_id,
+        name,
+        source_key,
+        webhook_secret,
+        action_type,
+        action_config
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING id, user_id, name, source_key, webhook_secret, action_type, action_config, is_active, created_at, updated_at;
+      `,
+      [
+        pipelineId,
+        userId,
+        data.name,
+        sourceKey,
+        webhookSecret,
+        data.action_type,
+        JSON.stringify(data.action_config ?? {}),
+      ]
+    );
 
-      subscribers.push(createdSubscriber);
+    const pipeline = pipelineResult.rows[0];
+    const subscribers = [];
+
+    if (data.subscribers && data.subscribers.length > 0) {
+      for (const subscriber of data.subscribers) {
+        const subscriberResult = await client.query(
+          `
+          INSERT INTO pipeline_subscribers (id, pipeline_id, target_url)
+          VALUES ($1, $2, $3)
+          RETURNING *;
+          `,
+          [randomUUID(), pipelineId, subscriber.target_url]
+        );
+
+        subscribers.push(subscriberResult.rows[0]);
+      }
     }
-  }
 
-  return {
-    ...pipeline,
-    subscribers,
-  };
+    await client.query("COMMIT");
+
+    return {
+      ...pipeline,
+      subscribers,
+    };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function getAllPipelines(userId: string) {
@@ -75,47 +106,6 @@ export async function getPipelineById(id: string, userId: string) {
 
 export async function removePipelineById(id: string, userId: string) {
   return deletePipelineById(id, userId);
-}
-
-function willCreateCycle(
-  links: Array<{ source_pipeline_id: string; target_pipeline_id: string }>,
-  sourcePipelineId: string,
-  targetPipelineId: string
-) {
-  const graph = new Map<string, string[]>();
-
-  for (const link of links) {
-    if (!graph.has(link.source_pipeline_id)) {
-      graph.set(link.source_pipeline_id, []);
-    }
-    graph.get(link.source_pipeline_id)!.push(link.target_pipeline_id);
-  }
-
-  if (!graph.has(sourcePipelineId)) {
-    graph.set(sourcePipelineId, []);
-  }
-  graph.get(sourcePipelineId)!.push(targetPipelineId);
-
-  const visited = new Set<string>();
-  const stack = new Set<string>();
-
-  function dfs(node: string): boolean {
-    if (stack.has(node)) return true;
-    if (visited.has(node)) return false;
-
-    visited.add(node);
-    stack.add(node);
-
-    const neighbors = graph.get(node) ?? [];
-    for (const neighbor of neighbors) {
-      if (dfs(neighbor)) return true;
-    }
-
-    stack.delete(node);
-    return false;
-  }
-
-  return dfs(sourcePipelineId);
 }
 
 export async function createPipelineLink(
@@ -149,11 +139,28 @@ export async function createPipelineLink(
     throw new Error("This link would create a cycle");
   }
 
-  return createPipelineLinkRecord({
-    id: randomUUID(),
-    source_pipeline_id: sourcePipelineId,
-    target_pipeline_id: targetPipelineId,
-  });
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const linkResult = await client.query(
+      `
+      INSERT INTO pipeline_links (id, source_pipeline_id, target_pipeline_id)
+      VALUES ($1, $2, $3)
+      RETURNING *;
+      `,
+      [randomUUID(), sourcePipelineId, targetPipelineId]
+    );
+
+    await client.query("COMMIT");
+    return linkResult.rows[0];
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function getPipelineLinks(pipelineId: string, userId: string) {

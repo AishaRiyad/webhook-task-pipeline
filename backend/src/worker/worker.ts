@@ -1,10 +1,8 @@
 import { randomUUID } from "crypto";
 
 import { pool } from "../db/database";
-import { createDeliveriesForJob } from "../modules/deliveries/delivery.service";
-import { findLinkedTargetPipelines } from "../modules/pipelines/pipelineLink.repository";
-import { createJobRecord, createWebhookEventRecord } from "../modules/webhooks/webhook.repository";
 import { sendFailureNotification } from "../shared/utils/failureNotifier";
+import { calculateNextRetry } from "../shared/utils/retry";
 
 const WORKER_NAME = process.env.WORKER_NAME || "job-worker";
 
@@ -14,11 +12,22 @@ const POLL_INTERVAL_MS =
 
 type JsonObject = Record<string, unknown>;
 
+type TransactionClient = {
+  query: (
+    text: string,
+    params?: unknown[]
+  ) => Promise<{
+    rows: Record<string, unknown>[];
+  }>;
+};
+
 type JobRow = {
   id: string;
   pipeline_id: string;
   webhook_event_id: string;
   status: string;
+  attempts: number;
+  max_attempts: number;
 };
 
 type PipelineActionConfig = {
@@ -53,27 +62,76 @@ async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function enqueueChainedJobs(sourceJob: JobRow, processedPayload: Record<string, unknown>) {
-  const targetPipelines = await findLinkedTargetPipelines(sourceJob.pipeline_id);
+async function createDeliveriesForJobTx(
+  client: TransactionClient,
+  jobId: string,
+  pipelineId: string
+) {
+  const subscribersResult = await client.query(
+    `
+    SELECT *
+    FROM pipeline_subscribers
+    WHERE pipeline_id = $1 AND is_active = TRUE
+    ORDER BY created_at ASC
+    `,
+    [pipelineId]
+  );
 
-  for (const targetPipeline of targetPipelines) {
-    const chainedWebhookEvent = await createWebhookEventRecord({
-      id: randomUUID(),
-      pipeline_id: targetPipeline.id,
-      headers: {
-        "x-internal-chain": true,
-        "x-parent-job-id": sourceJob.id,
-        "x-parent-pipeline-id": sourceJob.pipeline_id,
-      },
-      payload: processedPayload,
-    });
+  for (const subscriber of subscribersResult.rows) {
+    await client.query(
+      `
+      INSERT INTO job_deliveries (id, job_id, subscriber_id, status)
+      VALUES ($1, $2, $3, $4)
+      `,
+      [randomUUID(), jobId, subscriber.id, "pending"]
+    );
+  }
+}
 
-    await createJobRecord({
-      id: randomUUID(),
-      pipeline_id: targetPipeline.id,
-      webhook_event_id: chainedWebhookEvent.id,
-      status: "pending",
-    });
+async function enqueueChainedJobsTx(
+  client: TransactionClient,
+  sourceJob: JobRow,
+  processedPayload: Record<string, unknown>
+) {
+  const targetPipelinesResult = await client.query(
+    `
+    SELECT p.*
+    FROM pipeline_links pl
+    JOIN pipelines p ON p.id = pl.target_pipeline_id
+    WHERE pl.source_pipeline_id = $1
+      AND p.is_active = TRUE
+    ORDER BY pl.created_at ASC
+    `,
+    [sourceJob.pipeline_id]
+  );
+
+  for (const targetPipeline of targetPipelinesResult.rows) {
+    const chainedWebhookEventId = randomUUID();
+
+    await client.query(
+      `
+      INSERT INTO webhook_events (id, pipeline_id, headers, payload)
+      VALUES ($1, $2, $3, $4)
+      `,
+      [
+        chainedWebhookEventId,
+        targetPipeline.id,
+        JSON.stringify({
+          "x-internal-chain": true,
+          "x-parent-job-id": sourceJob.id,
+          "x-parent-pipeline-id": sourceJob.pipeline_id,
+        }),
+        JSON.stringify(processedPayload),
+      ]
+    );
+
+    await client.query(
+      `
+      INSERT INTO jobs (id, pipeline_id, webhook_event_id, status)
+      VALUES ($1, $2, $3, $4)
+      `,
+      [randomUUID(), targetPipeline.id, chainedWebhookEventId, "pending"]
+    );
   }
 }
 
@@ -104,14 +162,27 @@ async function fetchNextJob(): Promise<JobRow | null> {
       `
       UPDATE jobs
       SET status = 'processing',
-          started_at = NOW()
+          started_at = NOW(),
+          attempts = attempts + 1
       WHERE id = $1
       `,
       [job.id]
     );
 
+    const updatedJobResult = await client.query(
+      `
+      SELECT *
+      FROM jobs
+      WHERE id = $1
+      LIMIT 1
+      `,
+      [job.id]
+    );
+
+    const updatedJob = updatedJobResult.rows[0] as JobRow;
+
     await client.query("COMMIT");
-    return job;
+    return updatedJob;
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
@@ -122,11 +193,14 @@ async function fetchNextJob(): Promise<JobRow | null> {
 
 async function processJob(job: JobRow) {
   let pipeline: PipelineRow | null = null;
+  const client = await pool.connect();
 
   try {
     console.log(`[${WORKER_NAME}] Processing job: ${job.id}`);
 
-    const eventResult = await pool.query(
+    await client.query("BEGIN");
+
+    const eventResult = await client.query(
       `
       SELECT *
       FROM webhook_events
@@ -140,7 +214,7 @@ async function processJob(job: JobRow) {
       throw new Error(`Webhook event not found for job ${job.id}`);
     }
 
-    const pipelineResult = await pool.query(
+    const pipelineResult = await client.query(
       `
       SELECT *
       FROM pipelines
@@ -181,7 +255,7 @@ async function processJob(job: JobRow) {
         throw new Error("Invalid aggregation payload values");
       }
 
-      const existing = await pool.query(
+      const existing = await client.query(
         `
         SELECT *
         FROM pipeline_aggregates
@@ -195,7 +269,7 @@ async function processJob(job: JobRow) {
       if (existing.rows.length === 0) {
         newTotal = value;
 
-        await pool.query(
+        await client.query(
           `
           INSERT INTO pipeline_aggregates (
             id,
@@ -203,7 +277,7 @@ async function processJob(job: JobRow) {
             group_key,
             aggregate_value
           )
-          VALUES ($1,$2,$3,$4)
+          VALUES ($1, $2, $3, $4)
           `,
           [randomUUID(), pipeline.id, groupKey, newTotal]
         );
@@ -211,7 +285,7 @@ async function processJob(job: JobRow) {
         const current = Number(existing.rows[0].aggregate_value);
         newTotal = current + value;
 
-        await pool.query(
+        await client.query(
           `
           UPDATE pipeline_aggregates
           SET aggregate_value = $3,
@@ -236,7 +310,7 @@ async function processJob(job: JobRow) {
         const eventId = eventPayload[idField];
 
         if (eventId) {
-          const duplicateCheck = await pool.query(
+          const duplicateCheck = await client.query(
             `
             SELECT COUNT(*)
             FROM webhook_events
@@ -294,7 +368,7 @@ async function processJob(job: JobRow) {
     }
 
     if (shouldSkipJob) {
-      await pool.query(
+      await client.query(
         `
         UPDATE jobs
         SET status = 'skipped',
@@ -306,11 +380,12 @@ async function processJob(job: JobRow) {
         [job.id, skipReason]
       );
 
+      await client.query("COMMIT");
       console.log(`[${WORKER_NAME}] Job skipped: ${job.id}`);
       return;
     }
 
-    await pool.query(
+    await client.query(
       `
       UPDATE jobs
       SET status = 'completed',
@@ -322,41 +397,74 @@ async function processJob(job: JobRow) {
     );
 
     if (processedPayload) {
-      await createDeliveriesForJob(job.id, job.pipeline_id);
-      await enqueueChainedJobs(job, processedPayload);
+      await createDeliveriesForJobTx(client, job.id, job.pipeline_id);
+      await enqueueChainedJobsTx(client, job, processedPayload);
     }
 
+    await client.query("COMMIT");
     console.log(`[${WORKER_NAME}] Job completed: ${job.id}`);
   } catch (error) {
-    await pool.query(
-      `
-      UPDATE jobs
-      SET status = 'failed',
-          failed_at = NOW(),
-          error_message = $2
-      WHERE id = $1
-      `,
-      [job.id, error instanceof Error ? error.message : "Unknown error"]
-    );
-
-    if (pipeline?.user_id) {
-      await sendFailureNotification({
-        user_id: pipeline.user_id,
-        type: "job_failed",
-        title: "Job Processing Failed",
-        message: `Job ${job.id} failed during pipeline processing`,
-        timestamp: new Date().toISOString(),
-        details: {
-          job_id: job.id,
-          pipeline_id: job.pipeline_id,
-          webhook_event_id: job.webhook_event_id,
-          worker_name: WORKER_NAME,
-          error: error instanceof Error ? error.message : "Unknown processing error",
-        },
-      });
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // ignore rollback errors
     }
 
-    console.error(`[${WORKER_NAME}] Job failed: ${job.id}`, error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown processing error";
+    const isFinalFailure = job.attempts >= job.max_attempts;
+
+    if (isFinalFailure) {
+      await pool.query(
+        `
+        UPDATE jobs
+        SET status = 'failed',
+            failed_at = NOW(),
+            error_message = $2
+        WHERE id = $1
+        `,
+        [job.id, errorMessage]
+      );
+
+      if (pipeline?.user_id) {
+        await sendFailureNotification({
+          user_id: pipeline.user_id,
+          type: "job_failed",
+          title: "Job Processing Failed",
+          message: `Job ${job.id} failed after maximum retries`,
+          timestamp: new Date().toISOString(),
+          details: {
+            job_id: job.id,
+            pipeline_id: job.pipeline_id,
+            webhook_event_id: job.webhook_event_id,
+            worker_name: WORKER_NAME,
+            attempts: job.attempts,
+            max_attempts: job.max_attempts,
+            error: errorMessage,
+          },
+        });
+      }
+
+      console.error(`[${WORKER_NAME}] Job permanently failed: ${job.id}`, error);
+    } else {
+      const nextRetryAt = calculateNextRetry(job.attempts);
+
+      await pool.query(
+        `
+        UPDATE jobs
+        SET status = 'pending',
+            available_at = $2,
+            error_message = $3
+        WHERE id = $1
+        `,
+        [job.id, nextRetryAt, errorMessage]
+      );
+
+      console.warn(
+        `[${WORKER_NAME}] Job retry scheduled: ${job.id}, next attempt at ${nextRetryAt.toISOString()}`
+      );
+    }
+  } finally {
+    client.release();
   }
 }
 
