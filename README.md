@@ -15,124 +15,118 @@ The project includes:
 -automated tests
 
 ----------------------------------------------------------------------
+## Table of Contents
 
-Table of Contents
-
--Overview
--Core Features
--Architecture
--End-to-End Processing Flow
--Tech Stack
--Project Structure
--Database Design
--Key Technical Decisions
--Reliability and Failure Handling
--Security
--API Endpoints
--Request/Response Examples
--Running with Docker
--Running Locally Without Docker
--Testing
--CI Pipeline
--Frontend Features
--Operational Notes
+- Overview
+- Core Features
+- Architecture
+- End-to-End Processing Flow
+- Tech Stack
+- Project Structure
+- Database Design
+- Key Technical Decisions
+- Reliability and Failure Handling
+- Security
+- API Endpoints
+- Request/Response Examples
+- Running with Docker
+- Running Locally Without Docker
+- Testing
+- CI Pipeline
+- Frontend Features
+- Operational Notes
+- Future Improvements
 -Future Improvements
 
 ----------------------------------------------------------------------
 
-Overview
+## Overview
 
-This system is designed to solve a common reliability problem in webhook-based systems: external services should be able to send events quickly, while internal processing and downstream deliveries should happen safely in the background.
+This system is designed to solve a common reliability problem in webhook-based systems:  
+external services should be able to send events quickly, while internal processing and downstream deliveries should happen safely in the background.
 
 Instead of processing an incoming webhook synchronously, the backend:
 
-1-verifies the webhook signature
-2-stores the event in the database
-3-creates a background job
-4-returns 202 Accepted
-5-lets workers process and deliver the result asynchronously
+1. Verifies the webhook signature  
+2. Stores the event in the database  
+3. Creates a background job  
+4. Returns `202 Accepted`  
+5. Lets workers process and deliver the result asynchronously  
 
 Each user can create pipelines. A pipeline consists of:
 
--a unique webhook source URL
--a processing action
--one or more subscriber endpoints
+- A unique webhook source URL  
+- A processing action  
+- One or more subscriber endpoints  
 
 After processing, the resulting payload is delivered to subscribers with retry logic and detailed delivery attempt logging.
 
-The system also supports pipeline chaining, where the output of one pipeline can trigger another pipeline.
+The system also supports **pipeline chaining**, where the output of one pipeline can trigger another pipeline.
 
 ----------------------------------------------------------------------
 
-Core Features
+## Core Features
 
+### Pipeline Management
 
-Pipeline Management
+- Create pipelines
+- List pipelines
+- Get one pipeline
+- Delete pipelines
+- Add and remove subscribers
+- Create and remove links between pipelines
 
--create pipelines
--list pipelines
--get one pipeline
--delete pipelines
--add and remove subscribers
--create and remove links between pipelines
+### Webhook Processing
 
+- Signed webhook ingestion
+- Asynchronous processing
+- Event persistence
+- Job creation
 
-Webhook Processing
+### Supported Processing Actions
 
--signed webhook ingestion
--asynchronous processing
--event persistence
--job creation
+- Enrich
+- Transform
+- Filter
+- Deduplicate
+- Running sum
 
+### Job System
 
-Supported Processing Actions
+- PostgreSQL-backed job queue
+- Background job worker
+- Job retry with exponential backoff
+- Job status tracking
 
--enrich
--transform
--filter
--deduplicate
--running_sum
+### Delivery System
 
+- Separate delivery worker
+- Multiple subscribers per pipeline
+- Delivery retry with exponential backoff
+- Delivery attempt logs
+- Failure notifications
 
-Job System
+### Monitoring
 
--PostgreSQL-backed job queue
--background job worker
--job retry with exponential backoff
--job status tracking
+- Jobs page
+- Job details page
+- Metrics dashboard
+- Notifications page
+- Subscribers page
+- Chaining page
+- Webhook tester page
 
+### Infrastructure
 
-Delivery System
-
--separate delivery worker
--multiple subscribers per pipeline
--delivery retry with exponential backoff
--delivery attempt logs
--failure notifications
-
-
-Monitoring
-
--jobs page
--job details page
--metrics dashboard
--notifications page
--subscribers page
--chaining page
--webhook tester page
-
-
-Infrastructure
-
--Docker Compose
--health checks
--CI pipeline
--frontend and backend tests
+- Docker Compose
+- Health checks
+- CI pipeline
+- Frontend and backend tests
 
 
 ----------------------------------------------------------------------
 
-Architecture
+##Architecture
 
 The system is split into five main runtime components:
 
@@ -143,8 +137,9 @@ The system is split into five main runtime components:
 5-Frontend Dashboard
 
 
-High-level flow:
+### High-level Flow
 
+```
 External Sender
    |
    v
@@ -180,147 +175,136 @@ Delivery Worker
    |
    v
 Subscriber Endpoints
+```
 
 ----------------------------------------------------------------------
 
-End-to-End Processing Flow
+## End-to-End Processing Flow
 
-
-1. User creates a pipeline
+### 1. User creates a pipeline
 
 The user creates a pipeline through the dashboard or API.
 
-
 A pipeline includes:
 
--pipeline name
--action type
--action configuration
--optional subscriber URLs
-
+- Pipeline name
+- Action type
+- Action configuration
+- Optional subscriber URLs
 
 The backend generates:
 
--source_key
--webhook_secret
+- `source_key`
+- `webhook_secret`
 
 These are used for webhook ingestion and signature verification.
 
+---
 
-
-2. External system sends a webhook
+### 2. External system sends a webhook
 
 Webhook endpoint:
-POST /webhooks/sourceKey
 
-The request must include:
--x-webhook-timestamp
--x-webhook-signature
+`POST /webhooks/:sourceKey`
 
-The backend verifies the signature using HMAC SHA-256 and the pipeline's secret.
+The request must include headers:
 
+- `x-webhook-timestamp`
+- `x-webhook-signature`
 
+The backend verifies the signature using **HMAC SHA-256** and the pipeline's secret.
 
-3. Backend stores the event and queues a job
+---
 
+### 3. Backend stores the event and queues a job
 
 If the signature is valid:
 
--the payload is stored in webhook_events
--a new row is inserted into jobs
--the API returns 202 Accepted
+- The payload is stored in `webhook_events`
+- A new row is inserted into `jobs`
+- The API returns `202 Accepted`
 
+This keeps webhook ingestion **fast and safe**.
 
-This keeps webhook ingestion fast and safe.
+---
 
-
-
-
-4. Job worker processes the job
-
+### 4. Job worker processes the job
 
 The job worker:
 
--selects the next available pending job using row locking
--loads the webhook event
--loads the pipeline configuration
--applies the configured action
--stores the final result_payload
--creates delivery rows for subscribers
--creates chained jobs for downstream pipelines
+- Selects the next available pending job using row locking
+- Loads the webhook event
+- Loads the pipeline configuration
+- Applies the configured action
+- Stores the final `result_payload`
+- Creates delivery rows for subscribers
+- Creates chained jobs for downstream pipelines
 
+---
 
-
-
-5. Delivery worker sends the processed result
-
+### 5. Delivery worker sends the processed result
 
 For each delivery:
 
--send HTTP POST to subscriber URL
--record the attempt
--update delivery status
--retry if needed
--mark final failure after max attempts
+- Send HTTP `POST` to subscriber URL
+- Record the attempt
+- Update delivery status
+- Retry if needed
+- Mark final failure after max attempts
 
+---
 
-
-
-6. User monitors everything in the dashboard
-
+### 6. User monitors everything in the dashboard
 
 The frontend dashboard allows the user to:
 
--inspect pipeline definitions
--inspect jobs
--inspect delivery attempts
--inspect metrics
--receive notifications
--send test webhooks directly
+- Inspect pipeline definitions
+- Inspect jobs
+- Inspect delivery attempts
+- Inspect metrics
+- Receive notifications
+- Send test webhooks directly
+
+---
+
+# Tech Stack
+
+### Backend
+
+- Node.js
+- Express
+- TypeScript
+- PostgreSQL
+- Zod
+- JWT
+- bcryptjs
+- Swagger
+
+### Frontend
+
+- React
+- TypeScript
+- Vite
+- React Router
+- Framer Motion
+- Lucide Icons
+
+### DevOps / Tooling
+
+- Docker
+- Docker Compose
+- GitHub Actions
+- ESLint
+- Prettier
+- Vitest
+- Testing Library
 
 
 ----------------------------------------------------------------------
 
-Tech Stack
+## Project Structure
 
-
-Backend
-
--Node.js
--Express
--TypeScript
--PostgreSQL
--Zod
--JWT
--bcryptjs
--Swagger
-
-
-Frontend
-
--React
--TypeScript
--Vite
--React Router
--Framer Motion
--Lucide Icons
-
-
-DevOps / Tooling
-
--Docker
--Docker Compose
--GitHub Actions
--ESLint
--Prettier
--Vitest
--Testing Library
-
-
-----------------------------------------------------------------------
-
-Project Structure
-
+```
 .
 ├── backend
 │   ├── src
@@ -370,364 +354,323 @@ Project Structure
 │   └── ci.yml
 │
 └── docker-compose.yml
-
+```
 
 ----------------------------------------------------------------------
 
-Database Design
+## Database Design
 
-The database is not just used for persistence. It is also used as a lightweight queueing layer.
+The database is not only used for persistence.  
+It also acts as a **lightweight queueing layer** for job processing and delivery handling.
 
+---
 
-Main Tables
+## Main Tables
 
+### 1. users
 
-1-users
 Stores registered users.
 
-Important fields:
--id
--email
--password_hash
+**Important fields**
 
+- `id`
+- `email`
+- `password_hash`
 
-2-refresh_tokens
+---
+
+### 2. refresh_tokens
+
 Stores hashed refresh tokens.
 
-Important fields:
--id
--user_id
--token_hash
--expires_at
+**Important fields**
 
+- `id`
+- `user_id`
+- `token_hash`
+- `expires_at`
 
-3-pipelines
+---
+
+### 3. pipelines
+
 Stores pipeline definitions.
 
-Important fields:
--id
--user_id
--name
--source_key
--webhook_secret
--action_type
--action_config
--is_active
+**Important fields**
 
+- `id`
+- `user_id`
+- `name`
+- `source_key`
+- `webhook_secret`
+- `action_type`
+- `action_config`
+- `is_active`
 
-4-pipeline_links
+---
+
+### 4. pipeline_links
+
 Stores pipeline chaining links.
 
-Important fields:
--source_pipeline_id
--target_pipeline_id
+**Important fields**
 
-Constraints:
--unique source-target pair
--no self-loop at database level
+- `source_pipeline_id`
+- `target_pipeline_id`
 
+**Constraints**
 
-5-pipeline_subscribers
+- Unique source–target pair
+- No self-loop at database level
+
+---
+
+### 5. pipeline_subscribers
+
 Stores subscriber endpoints.
 
-Important fields:
--pipeline_id
--target_url
--is_active
+**Important fields**
 
+- `pipeline_id`
+- `target_url`
+- `is_active`
 
-6-webhook_events
+---
+
+### 6. webhook_events
+
 Stores all received webhook requests.
 
-Important fields:
--pipeline_id
--headers
--payload
+**Important fields**
 
+- `pipeline_id`
+- `headers`
+- `payload`
 
-7-jobs
-Acts as the processing queue.
+---
 
-Important fields:
--pipeline_id
--webhook_event_id
--status
--attempts
--max_attempts
--available_at
--started_at
--completed_at
--failed_at
--result_payload
--error_message
+### 7. jobs
 
+Acts as the **processing queue**.
 
-8-job_deliveries
+**Important fields**
+
+- `pipeline_id`
+- `webhook_event_id`
+- `status`
+- `attempts`
+- `max_attempts`
+- `available_at`
+- `started_at`
+- `completed_at`
+- `failed_at`
+- `result_payload`
+- `error_message`
+
+---
+
+### 8. job_deliveries
+
 Stores subscriber delivery tasks.
 
-Important fields:
--subscriber_id
--status
--attempts
--max_attempts
--next_retry_at
--last_response_status
--last_error
--delivered_at
+**Important fields**
 
+- `subscriber_id`
+- `status`
+- `attempts`
+- `max_attempts`
+- `next_retry_at`
+- `last_response_status`
+- `last_error`
+- `delivered_at`
 
-9-delivery_attempt_logs
+---
+
+### 9. delivery_attempt_logs
+
 Stores detailed delivery attempt history.
 
-Important fields:
--delivery_id
--attempt_number
--request_payload
--response_status
--response_body
--error_message
--attempted_at
+**Important fields**
 
+- `delivery_id`
+- `attempt_number`
+- `request_payload`
+- `response_status`
+- `response_body`
+- `error_message`
+- `attempted_at`
 
-10-pipeline_aggregates
-Stores state for aggregation-based processing such as running_sum.
+---
 
-Important fields:
--pipeline_id
--group_key
--aggregate_value
+### 10. pipeline_aggregates
 
+Stores state for aggregation-based processing such as `running_sum`.
 
-11-system_notifications
+**Important fields**
+
+- `pipeline_id`
+- `group_key`
+- `aggregate_value`
+
+---
+
+### 11. system_notifications
+
 Stores notifications for failed jobs and failed deliveries.
 
-Important fields:
--user_id
--type
--title
--message
--payload
--is_read
+**Important fields**
 
-
+- `user_id`
+- `type`
+- `title`
+- `message`
+- `payload`
+- `is_read`
 ----------------------------------------------------------------------
 
-Key Technical Decisions
+## Key Technical Decisions
 
-1. PostgreSQL as queue storage
-Instead of introducing RabbitMQ, Redis Streams, or another message broker, the project uses PostgreSQL as a lightweight durable queue.
+### 1. PostgreSQL as queue storage
 
-Why
--fewer moving parts
--easier local setup
--simpler Docker orchestration
--strong persistence guarantees
--transactional consistency
+Instead of introducing RabbitMQ, Redis Streams, or another message broker, the project uses **PostgreSQL as a lightweight durable queue**.
 
-Tradeoff
-At very large scale, a dedicated message broker may be more suitable. For this project scope, PostgreSQL is a good balance between simplicity and reliability.
+**Why**
 
+- Fewer moving parts
+- Easier local setup
+- Simpler Docker orchestration
+- Strong persistence guarantees
+- Transactional consistency
 
+**Tradeoff**
 
-2. Separate job worker and delivery worker
+At very large scale, a dedicated message broker may be more suitable.  
+For this project scope, PostgreSQL provides a good balance between simplicity and reliability.
+
+---
+
+### 2. Separate job worker and delivery worker
 
 The project intentionally separates:
--job processing
--delivery processing
 
+- Job processing
+- Delivery processing
 
-Why
+**Why**
 
 These two stages represent different concerns:
--pipeline transformation logic
--outbound HTTP delivery reliability
+
+- Pipeline transformation logic
+- Outbound HTTP delivery reliability
 
 This improves:
--separation of concerns
--observability
--independent scaling
--clearer error boundaries
 
-
-
-3. Asynchronous webhook handling
-Webhook requests return immediately after persistence and job creation.
-
-Why
--faster response to external senders
--prevents long webhook request times
--isolates downstream failures from the ingestion path
-
-Returned status:
-202 Accepted
-
-
-
-4. Transactional critical paths
-Critical multi-query operations are wrapped in database transactions.
-
-Examples:
--creating pipeline + initial subscribers
--creating pipeline links
--completing a job + creating deliveries + creating chained jobs
-
-Why
-This prevents partial state updates and improves consistency.
-
-
-
-5. Pipeline chaining with cycle detection
-Pipelines can trigger downstream pipelines, but cycle detection prevents infinite loops.
-
-Why
-Chaining adds flexibility and demonstrates a richer processing model than a single-step pipeline
-
-
-
-6. Retry logic for both jobs and deliveries
-
-The project supports retry at two different layers:
--processing retries for failed jobs
--delivery retries for subscriber failures
-
-Why
-
-Failures can happen during:
--processing logic
--outbound network delivery
-
+- Separation of concerns
+- Observability
+- Independent scaling
+- Clearer error boundaries
 
 ----------------------------------------------------------------------
 
-Reliability and Failure Handling
+## Reliability and Failure Handling
 
 Reliability was a major design goal.
 
-
-Job Retry
+### Job Retry
 
 If processing fails:
--attempts are incremented
--next retry is scheduled using exponential backoff
--after max attempts, the job is marked failed
 
+- Attempts are incremented
+- Next retry is scheduled using exponential backoff
+- After max attempts, the job is marked failed
 
-Delivery Retry
+### Delivery Retry
 
 If subscriber delivery fails:
--the delivery attempt is logged
--next retry time is scheduled
--after max attempts, the delivery is marked failed
 
+- The delivery attempt is logged
+- Next retry time is scheduled
+- After max attempts, the delivery is marked failed
 
-Attempt Logging
+### Attempt Logging
 
 Each delivery attempt stores:
--attempt number
--request payload
--HTTP status
--response body
--error message
--timestamp
 
-
-
-Failure Notifications
-
-The system creates notifications when:
--a job permanently fails
--a delivery permanently fails
-
-
-
-Transactions
-Critical operations are grouped in database transactions to avoid partial writes.
-
-
-
-Row Locking for Jobs
-
-The job worker uses database row locking to safely claim work.
-Pattern used: FOR UPDATE SKIP LOCKED
-
-This prevents multiple workers from processing the same job.
-
-
+- Attempt number
+- Request payload
+- HTTP status
+- Response body
+- Error message
+- Timestamp
 ----------------------------------------------------------------------
+## Security
 
-Security
+### Authentication
 
-
-Authentication
-Protected endpoints use JWT access tokens.
+Protected endpoints use **JWT access tokens**.
 
 Supported auth flow:
--register
--login
--get current user
--refresh token
--logout
 
+- Register
+- Login
+- Get current user
+- Refresh token
+- Logout
 
+### Password Hashing
 
-Password Hashing
-Passwords are hashed using bcrypt.
+Passwords are hashed using **bcrypt**.
 
+### Refresh Token Storage
 
+Refresh tokens are stored **hashed in the database**, not as raw values.
 
-Refresh Token Storage
-Refresh tokens are stored hashed in the database, not as raw values.
+### Webhook Signature Verification
 
+Each pipeline has its own `webhook_secret`.
 
+Incoming webhooks must include headers:
 
-Webhook Signature Verification
-Each pipeline has its own webhook_secret.
-
-Incoming webhooks must include:
--x-webhook-timestamp
--x-webhook-signature
-
+- `x-webhook-timestamp`
+- `x-webhook-signature`
 
 Signature verification uses:
--HMAC SHA-256
--timing-safe comparison
--timestamp tolerance to reduce replay risk
 
-
-
-Rate Limiting
-Webhook ingestion is protected by a rate-limiting middleware.
-
-Current implementation is in-memory, which is suitable for this project scope.
+- HMAC SHA-256
+- Timing-safe comparison
+- Timestamp tolerance to reduce replay risk
 
 
 ----------------------------------------------------------------------
 
-API Endpoints
+## API Endpoints
 
+Base URL
 
-Base URL:
 http://localhost:3000
 
+Swagger UI
 
-Swagger UI:
-http://localhost:3000/api-docs
+(http://localhost:3000/api-docs/#/Pipelines/post_pipelines)
 
 
+## Auth
 
-Auth
+### Register
 
-Register
-POST /auth/register
+POST `/auth/register`
 
-Request body:
+**Request body**
+
+```json
 {
   "email": "aisha@example.com",
   "password": "12345678"
 }
 
 
-Response:
+**Response:**
+```json
 {
   "message": "User registered successfully",
   "data": {
@@ -742,10 +685,13 @@ Response:
 
 
 
-Login
-POST /auth/login
+### Login
 
-Request body:
+POST `/auth/login`
+
+**Request body**
+
+```json
 {
   "email": "aisha@example.com",
   "password": "12345678"
@@ -753,9 +699,10 @@ Request body:
 
 
 
-Refresh Token
+**Refresh Token**
 POST /auth/refresh
 
+```json
 Request body:
 {
   "refreshToken": "jwt"
@@ -763,9 +710,10 @@ Request body:
 
 
 
-Logout
+**Logout**
 POST /auth/logout
 
+```json
 Request body:
 {
   "refreshToken": "jwt"
@@ -773,20 +721,26 @@ Request body:
 
 
 
-Current User
+**Current User**
 GET /auth/me
 Authorization: Bearer <access_token>
 
 ------------------------------------------------
+## Pipelines
 
-Pipelines
+### Create Pipeline
 
-Create Pipeline
-POST /pipelines
+POST `/pipelines`
+
+**Headers**
+
+```
 Authorization: Bearer <access_token>
+```
 
+**Example request**
 
-Example request:
+```json
 {
   "name": "Orders Running Sum",
   "action_type": "running_sum",
@@ -801,141 +755,217 @@ Example request:
     }
   ]
 }
+```
 
+### Supported `action_type` values
 
-Supported action_type values:
--transform
--filter
--enrich
--deduplicate
--running_sum
+- `transform`
+- `filter`
+- `enrich`
+- `deduplicate`
+- `running_sum`
 
+---
 
-Action config examples
+### Action Config Examples
 
-Transform
+#### Transform
+
+```json
 {
   "fields": ["orderId", "status", "amount"]
 }
+```
 
+#### Filter
 
-Filter
+```json
 {
   "field": "status",
   "value": "created"
 }
+```
 
+#### Enrich
 
-Enrich
+```json
 {}
+```
 
+#### Deduplicate
 
-Deduplicate
+```json
 {
   "id_field": "eventId"
 }
+```
 
+#### Running Sum
 
-Running Sum
+```json
 {
   "group_by_field": "customerId",
   "value_field": "amount",
   "target_field": "running_total"
 }
+```
 
 
 
-Get All Pipelines
-GET /pipelines
+### Get All Pipelines
+
+GET `/pipelines`
+
+**Headers**
+
+```
 Authorization: Bearer <access_token>
+```
 
+---
 
+### Get One Pipeline
 
-Get One Pipeline
-GET /pipelines/:id
+GET `/pipelines/:id`
+
+**Headers**
+
+```
 Authorization: Bearer <access_token>
+```
 
+---
 
-Delete Pipeline
-DELETE /pipelines/:id
+### Delete Pipeline
+
+DELETE `/pipelines/:id`
+
+**Headers**
+
+```
 Authorization: Bearer <access_token>
+```
 
 
 ----------------------------------------------
 
-Pipeline Links
+## Pipeline Links
 
-Create Pipeline Link
-POST /pipelines/:id/links
+### Create Pipeline Link
+
+POST `/pipelines/:id/links`
+
+**Headers**
+
+```
 Authorization: Bearer <access_token>
+```
 
+**Request body**
 
-Request body:
+```json
 {
   "target_pipeline_id": "uuid"
 }
-
+```
 
 This creates a link:
+
+```
 source pipeline (:id) -> target pipeline
+```
 
 Cycle creation is rejected.
 
+---
 
+### Get Pipeline Links
 
-Get Pipeline Links
-GET /pipelines/:id/links
+GET `/pipelines/:id/links`
+
+**Headers**
+
+```
 Authorization: Bearer <access_token>
+```
 
+---
 
-Delete Pipeline Link
-DELETE /pipelines/:id/links/:targetPipelineId
+### Delete Pipeline Link
+
+DELETE `/pipelines/:id/links/:targetPipelineId`
+
+**Headers**
+
+```
 Authorization: Bearer <access_token>
-
-
+```
 ------------------------------------------------
 
-Subscribers
+## Subscribers
 
+### Add Subscriber
 
-Add Subscriber
-POST /pipelines/:id/subscribers
+POST `/pipelines/:id/subscribers`
+
+**Headers**
+
+```
 Authorization: Bearer <access_token>
+```
 
+**Request body**
 
-Request body:
+```json
 {
   "target_url": "http://localhost:3000/subscriber-notification-service"
 }
+```
 
+---
 
+### Get Subscribers
 
-Get Subscribers
-GET /pipelines/:id/subscribers
+GET `/pipelines/:id/subscribers`
+
+**Headers**
+
+```
 Authorization: Bearer <access_token>
+```
 
+---
 
+### Delete Subscriber
 
-Delete Subscriber
-DELETE /pipelines/:id/subscribers/:subscriberId
+DELETE `/pipelines/:id/subscribers/:subscriberId`
+
+**Headers**
+
+```
 Authorization: Bearer <access_token>
+```
 
 
 ---------------------------------------------
 
-Webhooks
+## Webhooks
 
-Send Webhook
-POST /webhooks/:sourceKey
+### Send Webhook
 
+POST `/webhooks/:sourceKey`
 
-Required headers:
+**Required headers**
+
+```
 x-webhook-timestamp: 1710000000
 x-webhook-signature: <hex_hmac_signature>
 Content-Type: application/json
+```
 
+**Example body**
 
-Example body:
+```json
 {
   "eventId": "evt-1001",
   "orderId": "ORD-1002",
@@ -943,9 +973,11 @@ Example body:
   "amount": 200,
   "customerId": "cust-1"
 }
+```
 
+**Success response**
 
-Success response:
+```json
 {
   "message": "Webhook accepted and queued for processing",
   "data": {
@@ -955,104 +987,148 @@ Success response:
     "job_status": "pending"
   }
 }
-
+```
 
 ------------------------------------------
 
-Jobs
+## Jobs
 
-Get Jobs
-GET /jobs
+### Get Jobs
+
+GET `/jobs`
+
+**Headers**
+
+```
 Authorization: Bearer <access_token>
+```
 
 Returns all jobs for the authenticated user's pipelines.
 
+---
 
+### Get One Job
 
-Get One Job
-GET /jobs/:id
+GET `/jobs/:id`
+
+**Headers**
+
+```
 Authorization: Bearer <access_token>
+```
 
 Returns:
--job details
--deliveries
--attempt logs
 
+- Job details
+- Deliveries
+- Attempt logs
 
+---
 
-Get Job Deliveries
-GET /jobs/:id/deliveries
+### Get Job Deliveries
+
+GET `/jobs/:id/deliveries`
+
+**Headers**
+
+```
 Authorization: Bearer <access_token>
-
+```
 
 -------------------------------------------------
 
-Metrics
+## Metrics
 
-Get Metrics
-GET /metrics
+### Get Metrics
+
+GET `/metrics`
+
+**Headers**
+
+```
 Authorization: Bearer <access_token>
-
+```
 
 Returns metrics such as:
--total pipelines
--processed jobs
--failed jobs
--successful deliveries
--failed deliveries
--pending retries
+
+- Total pipelines
+- Processed jobs
+- Failed jobs
+- Successful deliveries
+- Failed deliveries
+- Pending retries
+
+---------------------------------------------------
+
+## Notifications
+
+### Get Notifications
+
+GET `/notifications`
+
+**Headers**
+
+```
+Authorization: Bearer <access_token>
+```
+
+---
+
+### Get Unread Notifications Count
+
+GET `/notifications/unread-count`
+
+**Headers**
+
+```
+Authorization: Bearer <access_token>
+```
+
+---
+
+### Mark Notification as Read
+
+PATCH `/notifications/:id/read`
+
+**Headers**
+
+```
+Authorization: Bearer <access_token>
+```
 
 
 ---------------------------------------------------
 
-Notifications
+## Health Check
 
+### Health Endpoint
 
-Get Notifications
-GET /notifications
-Authorization: Bearer <access_token>
+GET `/health`
 
-
-
-Get Unread Notifications Count
-GET /notifications/unread-count
-Authorization: Bearer <access_token>
-
-
-
-Mark Notification as Read
-PATCH /notifications/:id/read
-Authorization: Bearer <access_token>
+Used to verify **API and database connectivity**.
 
 
 ---------------------------------------------------
 
-Health Check
+## Demo Subscriber Endpoints
 
-Health Endpoint
-GET /health
+These endpoints are included in the backend for **local testing**.
 
-Used to verify API and database connectivity.
-
-
----------------------------------------------------
-
-Demo Subscriber Endpoints
-
-These are included in the backend for local testing:
+```
 POST /subscriber-order-service
 POST /subscriber-analytics-service
 POST /subscriber-notification-service
+```
 
-
-These endpoints print received payloads and respond successfully, which makes local testing easier.
+These endpoints print the received payloads and respond successfully, which makes local testing easier.
 
 
 ----------------------------------------------------
+## Request / Response Examples
 
-Request/Response Examples
+### Example: Create Pipeline
 
-Example: Create pipeline
+```bash
 curl -X POST http://localhost:3000/pipelines \
   -H "Authorization: Bearer ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
@@ -1066,326 +1142,375 @@ curl -X POST http://localhost:3000/pipelines \
       }
     ]
   }'
+```
 
+---
 
-  Example: Send signed webhook
-  You can use the built-in Webhook Tester page in the frontend, or generate a signature manually using the pipeline secret.
+### Example: Send Signed Webhook
 
+You can use the built-in **Webhook Tester** page in the frontend, or generate a signature manually using the pipeline secret.
 
-  The frontend includes a Webhook Tester page that:
-  -accepts source key
-  -accepts webhook secret
-  -generates HMAC signature
-  -sends the webhook request
+The frontend includes a **Webhook Tester** page that:
 
-  This is the easiest way to test webhook ingestion manually.
+- Accepts source key
+- Accepts webhook secret
+- Generates HMAC signature
+- Sends the webhook request
 
+This is the easiest way to test webhook ingestion manually.
+
+-------------------------------------------------------------------
+## Running with Docker
+
+### Prerequisites
+
+- Docker
+- Docker Compose
+
+---
+
+### Start the Entire System
+
+From the repository root:
+
+```bash
+docker compose up --build
+```
+
+This starts:
+
+- PostgreSQL
+- Database initialization service
+- API server
+- Job worker
+- Delivery worker
+- Frontend
+
+---
+
+### URLs
+
+- Frontend: http://localhost:5173
+- API: http://localhost:3000
+- Swagger Docs: http://localhost:3000/api-docs
+
+---
+
+### Docker Services
+
+The Compose file includes the following services:
+
+- `postgres`
+- `db_init`
+- `api`
+- `job_worker`
+- `delivery_worker`
+- `frontend`
+
+The backend containers run **compiled code**, while local non-Docker development uses **development scripts**.
+
+-------------------------------------------------------------------
+
+ ## Running Locally Without Docker
+
+### 1. Start PostgreSQL
+
+Make sure PostgreSQL is running locally and create a database matching your backend environment variables.
+
+---
+
+### 2. Backend Setup
+
+Inside the `backend` directory:
+
+```bash
+npm install
+```
+
+Create a `.env` file with values like:
+
+```env
+PORT=3000
+
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=webhook_pipeline
+DB_USER=postgres
+DB_PASSWORD=postgres
+
+JWT_ACCESS_SECRET=access_secret
+JWT_REFRESH_SECRET=refresh_secret
+JWT_ACCESS_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=7d
+
+WEBHOOK_RATE_LIMIT_WINDOW_MS=60000
+WEBHOOK_RATE_LIMIT_MAX_REQUESTS=10
+
+WORKER_POLL_INTERVAL_MS=2000
+DELIVERY_WORKER_POLL_INTERVAL_MS=2000
+
+FAILURE_NOTIFICATION_URL=http://localhost:3000/subscriber-notification-service
+```
+
+Initialize database tables:
+
+```bash
+npm run db:init
+```
+
+Run the API server:
+
+```bash
+npm run dev
+```
+
+Run the job worker in another terminal:
+
+```bash
+npm run worker
+```
+
+Run the delivery worker in another terminal:
+
+```bash
+npm run worker:delivery
+```
+
+---
+
+### 3. Frontend Setup
+
+Inside the `frontend` directory:
+
+```bash
+npm install
+npm run dev
+```
+
+Frontend default URL:
+
+```
+http://localhost:5173
+```
 
   -------------------------------------------------------------------
 
-  Running with Docker
+## Testing
 
-  Prerequisites
-  -Docker
-  -Docker Compose
+The project includes automated tests for both **backend** and **frontend**.
 
+---
 
-  Start the entire system
+## Backend Tests
 
-  From the repository root:
-  docker compose up --build
+The backend uses **Vitest**.
 
+**Covered areas**
 
-  This starts:
-  -PostgreSQL
-  -database initialization service
-  -API server
-  -job worker
-  -delivery worker
-  -frontend
+- Webhook signature verification
+- Rate limiting middleware
+- Retry backoff helper
+- Pipeline cycle detection
 
+**Run backend tests**
 
-  URLs
-  Frontend: http://localhost:5173
-  API: http://localhost:3000
-  Swagger Docs: http://localhost:3000/api-docs
+```bash
+cd backend
+npm test
+```
 
+**Other useful commands**
 
+```bash
+npm run lint:ci
+npm run format
+npm run format:check
+npm run typecheck
+npm run build
+```
 
-  Docker services
+---
 
-  The Compose file includes:
-  -postgres
-  -db_init
-  -api
-  -job_worker
-  -delivery_worker
-  -frontend
+## Frontend Tests
 
+The frontend uses:
 
-  The backend containers run compiled code, while local non-Docker development uses dev scripts.
+- Vitest
+- Testing Library
+- jsdom
 
+**Covered areas**
 
-  -------------------------------------------------------------------
+- Protected route behavior
+- Component rendering
 
-  Running Locally Without Docker
+**Run frontend tests**
 
-  1. Start PostgreSQL
-  Make sure PostgreSQL is running locally and create a database matching your backend env variables.
+```bash
+cd frontend
+npm test
+```
 
+**Other useful commands**
 
-  2. Backend setup
-  
-  Inside backend:
-  npm install
-
-  Create .env with values like:
-  PORT=3000
-  DB_HOST=localhost
-  DB_PORT=5432
-  DB_NAME=webhook_pipeline
-  DB_USER=postgres
-  DB_PASSWORD=postgres
-
-  JWT_ACCESS_SECRET=access_secret
-  JWT_REFRESH_SECRET=refresh_secret
-  JWT_ACCESS_EXPIRES_IN=15m
-  JWT_REFRESH_EXPIRES_IN=7d
-
-  WEBHOOK_RATE_LIMIT_WINDOW_MS=60000
-  WEBHOOK_RATE_LIMIT_MAX_REQUESTS=10
-
-  WORKER_POLL_INTERVAL_MS=2000
-  DELIVERY_WORKER_POLL_INTERVAL_MS=2000
-
-  FAILURE_NOTIFICATION_URL=http://localhost:3000/subscriber-notification-service
-
-
-
-  Initialize tables:
-  npm run db:init
-
-
-
-  Run API server:
-  npm run dev
-
-
-  Run job worker in another terminal:
-  npm run worker
-
-
-  Run delivery worker in another terminal:
-  npm run worker:delivery
-
-
-
-  3. Frontend setup
-
-  Inside frontend:
-  npm install
-  npm run dev
-
-
-  Frontend default URL:
-  http://localhost:5173
-
+```bash
+npm run lint:ci
+npm run format
+npm run format:check
+npm run typecheck
+npm run build
+```
 
   -------------------------------------------------------------------
 
-  Testing
+## CI Pipeline
 
-  The project includes automated tests for both backend and frontend.
+GitHub Actions runs automated checks for both **backend** and **frontend**.
 
+---
 
-  Backend Tests
-  Backend uses Vitest.
+### Backend CI Steps
 
+- Install dependencies
+- Format check
+- Lint
+- Typecheck
+- Tests
+- Build
 
-  Covered areas:
-  -webhook signature verification
-  -rate limiting middleware
-  -retry backoff helper
-  -pipeline cycle detection
+---
 
+### Frontend CI Steps
 
-  Run backend tests:
-  cd backend
-  npm test
+- Install dependencies
+- Format check
+- Lint
+- Typecheck
+- Tests
+- Build
 
-  
-  Other useful commands:
-  npm run lint:ci
-  npm run format
-  npm run format:check
-  npm run typecheck
-  npm run build
+---
 
+### Docker Validation
 
+The CI pipeline also builds:
 
+- Backend Docker image
+- Frontend Docker image
 
-  Frontend Tests
-
-  Frontend uses:
-  -Vitest
-  -Testing Library
-  -jsdom
-
-
-  Covered areas:
-  -protected route behavior
-  -component rendering
-
-
-  Run frontend tests:
-  cd frontend
-  npm test
-
-
-  Other useful commands:
-  npm run lint:ci
-  npm run format
-  npm run format:check
-  npm run typecheck
-  npm run build
-
+This ensures the project is both **code-valid** and **container-ready**.
 
   -------------------------------------------------------------------
 
-  CI Pipeline
+  ## Frontend Features
 
-  GitHub Actions runs checks for both backend and frontend.
+The frontend dashboard is not just decorative.  
+It is directly connected to the API and provides **operational visibility** into the system.
 
+---
 
-  Backend CI steps
-  install dependencies
-  format check
-  lint
-  typecheck
-  tests
-  build
+### Pages
 
+- Login
+- Signup
+- Dashboard
+- Pipelines
+- Jobs
+- Job Details
+- Subscribers
+- Pipeline Chaining
+- Webhook Tester
+- Metrics
+- Notifications
 
+---
 
-  Frontend CI steps
-  install dependencies
-  format check
-  lint
-  typecheck
-  tests
-  build
+### Main UI Capabilities
 
-
-  Docker validation
-
-  CI also builds:
-  backend Docker image
-  frontend Docker image
-
-
-  This ensures the project is both code-valid and container-ready.
-
+- Create pipelines with action configuration
+- Delete pipelines
+- Add and delete subscribers
+- Create and remove links between pipelines
+- View job list
+- Inspect delivery logs
+- Read notifications
+- View metrics
+- Test signed webhooks directly from the browser
+- 
   -------------------------------------------------------------------
 
-  Frontend Features
+## Operational Notes
 
-  The frontend dashboard is not just decorative. It is directly connected to the API and provides operational visibility.
+### Local Testing Strategy
 
+For easier demo and manual validation, the backend includes mock subscriber endpoints:
 
-  Pages
-  Login
-  Signup
-  Dashboard
-  Pipelines
-  Jobs
-  Job Details
-  Subscribers
-  Pipeline Chaining
-  Webhook Tester
-  Metrics
-  Notifications
+```
+/subscriber-order-service
+/subscriber-analytics-service
+/subscriber-notification-service
+```
 
+This allows you to:
 
-  Main UI Capabilities
-  -create pipelines with action configuration
-  -delete pipelines
-  -add and delete subscribers
-  -create and remove links between pipelines
-  -view job list
-  -inspect delivery logs
-  -read notifications
-  -view metrics
-  -test signed webhooks from the browser
+- Create pipelines with real subscriber URLs
+- Send test webhooks
+- Observe worker processing
+- Inspect delivery logs without needing external services
 
+---
 
-  -------------------------------------------------------------------
+### Frontend Webhook Tester
 
-  Operational Notes
+The **Webhook Tester** page computes HMAC signatures in the browser using the provided webhook secret.  
+This feature was intentionally added to make **manual end-to-end testing easier**.
 
-  Local testing strategy
+---
 
-  For easier demo and manual validation, the backend includes mock subscriber endpoints:
+### Rate Limiting Scope
 
-  /subscriber-order-service
-  /subscriber-analytics-service
-  /subscriber-notification-service
-
-
-  This allows you to:
-  -create pipelines with real subscriber URLs
-  -send test webhooks
-  -observe worker processing
-  -inspect delivery logs without needing external services
-
-
-  Frontend Webhook Tester
-  The Webhook Tester page computes HMAC signatures in the browser using the provided webhook secret. This was intentionally added to make manual end-to-end testing easier.
-
-
-  Rate Limiting Scope
-  Webhook rate limiting is currently implemented in-memory. This is appropriate for the current project scope but would likely move to Redis in a distributed production environment.
+Webhook rate limiting is currently implemented **in-memory**.  
+This approach is appropriate for the current project scope but would likely move to **Redis** in a distributed production environment.
 
   -------------------------------------------------------------------
+## Future Improvements
 
-  Future Improvements
+Possible future enhancements include:
 
-  Possible future enhancements include:
-  -distributed rate limiting with Redis
-  -delivery claiming/locking similar to job claiming
-  -dead-letter queue support
-  -idempotency keys for webhook ingestion
-  -stronger metrics and tracing
-  -WebSocket/live dashboard updates
-  -pipeline templates
-  -role-based access control
-  -dedicated message broker for very large scale
-
+- Distributed rate limiting with Redis
+- Delivery claiming/locking similar to job claiming
+- Dead-letter queue support
+- Idempotency keys for webhook ingestion
+- Stronger metrics and tracing
+- WebSocket or live dashboard updates
+- Pipeline templates
+- Role-based access control
+- Dedicated message broker for very large scale deployments
+- 
   -------------------------------------------------------------------
+## Summary
 
-  Summary
+This project implements a complete **webhook-driven asynchronous processing platform** with:
 
-  This project implements a complete webhook-driven asynchronous processing platform with:
+- Signed webhook ingestion
+- PostgreSQL-backed job queue
+- Processing and delivery workers
+- Retry logic
+- Delivery logs
+- Pipeline chaining
+- Notifications
+- Metrics
+- Full-stack dashboard
+- Docker setup
+- CI pipeline
+- Automated tests
 
-  -signed webhook ingestion
-  -PostgreSQL-backed job queue
-  -processing and delivery workers
-  -retry logic
-  -delivery logs
-  -pipeline chaining
-  -notifications
-  -metrics
-  -full-stack dashboard
-  -Docker setup
-  -CI
-  -tests
+The system was designed to balance:
 
- 
- It was designed to balance:
- -reliability
- -modularity
- -simplicity of setup
- -visibility into system behavior
-
+- Reliability
+- Modularity
+- Simplicity of setup
+- Visibility into system behavior
 
 
 
