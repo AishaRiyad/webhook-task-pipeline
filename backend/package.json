@@ -7,7 +7,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "worker": "ts-node-dev --respawn --transpile-only src/worker/worker.ts",
     "worker:delivery": "ts-node-dev --respawn --transpile-only src/worker/deliveryWorker.ts",
-    "build": "tsc",
+    "build": "tsc && mkdir -p dist/db/sql && cp -r src/db/sql/* dist/db/sql/",
     "start": "node dist/server.js",
     "start:worker": "node dist/worker/worker.js",
     "start:delivery-worker": "node dist/worker/deliveryWorker.js",
