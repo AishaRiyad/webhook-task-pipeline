@@ -11,6 +11,7 @@ import WebhookTesterPage from "./pages/WebhookTesterPage";
 import JobDetailsPage from "./pages/JobDetailsPage";
 import MetricsPage from "./pages/MetricsPage";
 import NotificationsPage from "./pages/NotificationsPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
 import PrivateRoute from "./components/PrivateRoute";
 
 export default function App() {
@@ -96,6 +97,15 @@ export default function App() {
         element={
           <PrivateRoute>
             <NotificationsPage />
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/analytics"
+        element={
+          <PrivateRoute>
+            <AnalyticsPage />
           </PrivateRoute>
         }
       />

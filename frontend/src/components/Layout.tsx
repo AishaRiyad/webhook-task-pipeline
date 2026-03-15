@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Users,
   Workflow,
+  LineChart,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useEffect, useState, type ReactNode } from "react";
@@ -90,6 +91,11 @@ export default function Layout({ children }: Props) {
           <NavLink to="/metrics" className="nav-link">
             <BarChart3 size={18} />
             <span>Metrics</span>
+          </NavLink>
+
+          <NavLink to="/analytics" className="nav-link">
+            <LineChart size={18} />
+            <span>Analytics</span>
           </NavLink>
 
           <NavLink to="/notifications" className="nav-link notification-link">
