@@ -1428,8 +1428,8 @@ It is directly connected to the API and provides **operational visibility** into
 - Webhook Tester
 - Metrics
 - Notifications
+-Analytics Dashboard
 
----
 
 ### Main UI Capabilities
 
@@ -1443,6 +1443,22 @@ It is directly connected to the API and provides **operational visibility** into
 - View metrics
 - Test signed webhooks directly from the browser
 - 
+
+### Analytics Dashboard
+![Analytics Dashboard](docs/analytics-dashboard.png)
+To improve observability and make the system easier to monitor, I added a **Pipeline Analytics Dashboard** to the frontend.
+
+This page visualizes key operational metrics using charts, allowing users to quickly understand system behavior without manually inspecting logs or database records.
+
+The dashboard includes:
+
+- Job status distribution (pending, processing, completed, failed)
+- Delivery success vs failure rates
+- Pipeline activity insights
+- Visual charts for quick system monitoring
+
+This feature helps operators quickly identify failures, monitor pipeline performance, and gain insights into system activity.
+
   -------------------------------------------------------------------
 
 ## Operational Notes
