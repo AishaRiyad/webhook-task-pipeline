@@ -38,9 +38,9 @@ jobs:
         working-directory: backend
         run: npm run typecheck
 
-      - name: Run backend tests
+      - name: Run backend tests with coverage
         working-directory: backend
-        run: npm test
+        run: npm run test -- --coverage
 
       - name: Build backend
         working-directory: backend
@@ -77,9 +77,9 @@ jobs:
         working-directory: frontend
         run: npm run typecheck
 
-      - name: Run frontend tests
+      - name: Run frontend tests with coverage
         working-directory: frontend
-        run: npm test
+        run: npm run test -- --coverage
 
       - name: Build frontend
         working-directory: frontend
