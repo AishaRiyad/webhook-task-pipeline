@@ -1,18 +1,23 @@
-Webhook-Driven Task Processing Pipeline
+# Webhook-Driven Task Processing Pipeline
+
+[![Tests](https://github.com/AishaRiyad/webhook-task-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/AishaRiyad/webhook-task-pipeline/actions)
+![Node](https://img.shields.io/badge/node-20-green)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
 A full-stack webhook processing platform that receives signed webhook events, queues them for asynchronous background processing, applies configurable pipeline actions, and delivers the results to registered subscriber endpoints.
 
 The project includes:
 
--a modular TypeScript backend
--PostgreSQL-backed job queue
--separate processing and delivery workers
--retry logic for jobs and deliveries
--pipeline chaining with cycle detection
--a React dashboard for monitoring and management
--Docker Compose setup
--GitHub Actions CI
--automated tests
+- a modular TypeScript backend  
+- PostgreSQL-backed job queue  
+- separate processing and delivery workers  
+- retry logic for jobs and deliveries  
+- pipeline chaining with cycle detection  
+- a React dashboard for monitoring and management  
+- Docker Compose setup  
+- GitHub Actions CI  
+- automated tests
+
 
 ----------------------------------------------------------------------
 ## Table of Contents
@@ -126,15 +131,16 @@ The system also supports **pipeline chaining**, where the output of one pipeline
 
 ----------------------------------------------------------------------
 
-##Architecture
+## Architecture
 
 The system is split into five main runtime components:
 
-1-API Server
-2-PostgreSQL Database
-3-Job Worker
-4-Delivery Worker
-5-Frontend Dashboard
+- API Server  
+- PostgreSQL Database  
+- Job Worker  
+- Delivery Worker  
+- Frontend Dashboard  
+
 
 
 ### High-level Flow
